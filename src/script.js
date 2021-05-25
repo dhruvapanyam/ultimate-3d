@@ -1,3 +1,6 @@
+// const socket = io("http://192.168.0.105:8080");
+
+
 import './style.css'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
@@ -8,7 +11,7 @@ import { AnimationMixer, Vector3 } from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js'
 
-// console.log(OrbitControls)
+// // console.log(OrbitControls)
 // Debug
 const gui = new dat.GUI()
 
@@ -108,6 +111,10 @@ PLANE.rotation.x = - Math.PI/2
 PLANE.receiveShadow = true;
 scene.add(PLANE)
 
+const DISC = new THREE.Mesh(new THREE.SphereBufferGeometry(0.5,64,64), new THREE.MeshStandardMaterial({color: '#000000'}))
+DISC.castShadow = true;
+DISC.receiveShadow = true;
+scene.add(DISC)
 
 
 function loadModel(model_path, callback){
@@ -125,10 +132,16 @@ function loadAnimation(anim_path, callback){
     fbxLoader.load(
         './models/animations/'+anim_path+'.fbx',
         function(obj){
-            callback(anim_path, obj.animations[0])
+            console.log('loadAnimation:',anim_path,obj)
+            if(anim_path == 'untitled')
+                callback(anim_path, obj.animations[1])
+            else
+                callback(anim_path, obj.animations[0])
         }
     )
 }
+
+
 
 
 class ThirdPersonCamera {
@@ -149,10 +162,11 @@ class ThirdPersonCamera {
         let rot = obj.rotation.y;
         let z_comp = Math.cos(rot);
         let x_comp = Math.sin(rot);
-        // console.log(x_comp,z_comp)
+        // // console.log(x_comp,z_comp)
 
-        this.camera.position.x = obj.position.x-20*x_comp;
-        this.camera.position.z = obj.position.z-20*z_comp;
+        let bone = 'mixamorig1Hips'
+        this.camera.position.x = bones[bone].getWorldPosition(new Vector3).x - 20*x_comp;
+        this.camera.position.z = bones[bone].getWorldPosition(new Vector3).z - 20*z_comp;
 
         this.camera.lookAt(obj.position.x + 20*x_comp, 0, obj.position.z + 20*z_comp)
     }
@@ -160,10 +174,11 @@ class ThirdPersonCamera {
 }
 
 
+const intro = 'idle'
 class CharacterController {
-    constructor(model){
+    constructor(model, states){
         this.entity = model;
-        this.mixer = new THREE.AnimationMixer(this.entity)
+        this.mixer = new THREE.AnimationMixer(this.entity.children[0])
         scene.add(this.entity)
         this.animations = {}
 
@@ -174,7 +189,11 @@ class CharacterController {
 
         this.state = 'idle'
 
-        this.FSM = new FiniteStateMachine()
+        this.FSM = new FiniteStateMachine(states)
+
+
+
+        this.velocity = 0;
 
     }
 
@@ -182,40 +201,100 @@ class CharacterController {
         let temp = this.mixer.clipAction(anim)
         // temp.timeScale = 60
         this.animations[path] = temp
-        console.log(this.animations['idle'])
-        // console.log(this.animations)
-        if(path == 'idle') {console.log('playing');this.animations[path].play(); console.log(this.animations['idle'])}
-        if(path == 'jump_catch') this.animations[path].setLoop(THREE.LoopOnce)
+        // // console.log(this.animations['idle'])
+        console.log(path,this.animations[path])
+        // console.log('CharacterController::addAnimation:',path);
+        if(path == intro) {this.animations[path].play();}
+        if(path == 'vertical') this.animations[path].setLoop(THREE.LoopOnce)
     }
 
+
+    addTransition(prev, req, next, options={}){
+        // console.log('CharacterController::addTransition: calling inner functions');
+        this.FSM.addTransition(prev, req, next, options)
+    }
+
+
+
     processInput(inp){
-        let new_state = this.state;
-        if(this.state == 'jump_catch'){
-            if(this.animations['jump_catch'].time > 2.2){
-                new_state = 'idle'
-                this.FSM.currentState = 'idle'
-            }
+
+
+        let new_state = this.FSM.updateState(inp);
+
+        if(new_state == null) return;
+        else {
+            // need to transition to new_state
+
+            let prev = new_state.prev;
+            let next = new_state.next;
+            let options = new_state.options;
+
+            console.log('CharacterController::processInput: Transitioning from',prev,'to',next,'! Options:',options);
+
+            this.animations[next].time = options.start_time;
+            this.animations[next].enabled = true;
+            // this.animations[prev].setEffectiveWeight(1-options.effectiveWeight);
+            this.animations[next].setEffectiveWeight(1.0);
+
+            // if(0 && options.crossfade == true) this.animations[next].crossFadeFrom(this.animations[prev], options.crossFadeDuration, options.crossFadeWarp);
+            this.animations[prev].fadeOut(0.5)
+
+            this.animations[next].fadeIn(0.5)
+            this.animations[next].play()
+            console.log('Playing animation:',next)
+
+            
+
+            this.state = next;
+
         }
-        else{
-            this.FSM.updateState(inp);
-            new_state = this.FSM.currentState
+
+        // let new_state = this.state;
+        // if(this.state == 'vertical'){
+        //     if(this.animations['vertical'].time > 2.2){
+        //         new_state = 'idle'
+        //         this.FSM.currentState = 'idle'
+        //     }
+        // }
+        // else{
+        //     this.FSM.updateState(inp);
+        //     new_state = this.FSM.currentState
+        // }
+        // if(new_state == this.state) return;
+
+        // // change of state
+
+        // // can universally crossfade and transition
+
+        // let anim_name = new_state
+        // // // console.log('anim name:',anim_name)
+        // this.animations[anim_name].time = 0.0
+        // this.animations[anim_name].enabled = true
+        // this.animations[anim_name].setEffectiveWeight(1.0)
+        // this.animations[anim_name].crossFadeFrom(this.animations[this.state], 0.3, true)
+        // // this.animations[this.state].stop()
+        // this.animations[anim_name].play()
+
+        // this.state = new_state  
+        
+        
+    }
+
+    updateVelocity(){
+        if(this.state == 'idle'){
+            this.velocity = Math.max(0, this.velocity * 0.9)
         }
-        if(new_state == this.state) return;
+        else if(this.state == 'jogging'){
+            this.velocity = Math.min(this.velocity+0.005, 0.3);
+        }
+        else if(this.state == 'running'){
+            this.velocity = Math.min(this.velocity+0.005, 0.6);
+        }
 
-        // change of state
+        this.entity.translateZ(this.velocity)
 
-        // can universally crossfade and transition
-
-        let anim_name = new_state
-        // console.log('anim name:',anim_name)
-        this.animations[anim_name].time = 0.0
-        this.animations[anim_name].enabled = true
-        this.animations[anim_name].setEffectiveWeight(1.0)
-        this.animations[anim_name].crossFadeFrom(this.animations[this.state], 0.3, true)
-        // this.animations[this.state].stop()
-        this.animations[anim_name].play()
-
-        this.state = new_state        
+        if(this.input.keys.d == true) {this.entity.rotation.y -= Math.PI/40;}
+        else if(this.input.keys.a == true) this.entity.rotation.y += Math.PI/40
     }
 
 
@@ -224,14 +303,9 @@ class CharacterController {
         this.camera.update(this.entity)
 
         this.processInput(this.input.keys)
-        if(this.state == 'jogging'){
-            this.entity.translateZ(0.2)
-        }
-        else if(this.state == 'running'){
-            this.entity.translateZ(0.6)
-        }
-        if(this.input.keys.d == true) {this.entity.rotation.y -= Math.PI/40;console.log(this.entity.rotation.y)}
-        else if(this.input.keys.a == true) this.entity.rotation.y += Math.PI/40
+
+        this.updateVelocity()
+        
     }
 }
 
@@ -265,60 +339,193 @@ class CharacterControllerInput {
 }
 
 class FiniteStateMachine {
-    constructor(){
+    constructor(states){
         this.currentState = 'idle'
+
+        this.special_rules = {'vertical': [{function_check: x => (x.time > 2.2), state: 'idle'}]}
+
+        this.states = {}
+        for(let s of states){
+            this.states[s] = new FSMState(s)
+        }
+    }
+
+    satisfiesRequirements(inp, inp_key) {
+        // inp: {'w':true, 'shift':false,...}
+        let requirements = JSON.parse(inp_key);
+        // requirements = {'true':[...], 'false':[...]}
+        for(let t of requirements.true){
+            if(inp[t] == false) return false;
+        }
+
+        for(let f of requirements.false){
+            if(inp[f] == true) return false;
+        }
+
+        return true;
+    }
+
+    checkCollision(req, inp_key) {
+        // req: {true:['w','shift', ...], false:[' ','d', ...]}
+        let true_set = new Set(req.true)
+        let false_set = new Set(req.false)
+        // // console.log('FSM::checkCollision: inp_key =',inp_key)
+        inp_key = JSON.parse(inp_key);
+        for(let t of inp_key.true){
+            if(true_set.has(t) == false) return false;
+        }
+
+        for(let f of inp_key.false){
+            if(false_set.has(f) == false) return false;
+        }
+
+        return true;
+    }
+
+    addTransition(prev, req, next, options){
+        // // console.log('FSM::addTransition: entered function. Params:',prev,req,next,options);
+        for(let inp_key in this.states[prev].transitions){
+            // // console.log('Checking collision with',inp_key)
+            if(this.checkCollision(req, inp_key))
+            {
+                // console.log('This transition:',prev,req,next,'is comparable to another transition')
+                return null;
+            }
+        }
+        // console.log('FSM::addTransition: adding transition',req,next);
+        this.states[prev].addTransition(req, next, options);
     }
 
     updateState(inp){
-        if(this.currentState == 'idle'){
-            if(inp['w'] == true)
-                this.currentState = 'jogging'
-            else if(inp[' '] == true)
-                this.currentState = 'jump_catch'
+
+        // convert inp to standard form
+        // then check if it exists in this.states[this.currentState].transitions
+
+        let inp_key = null;
+        // // console.log('FSM::updateState: current state\'s transitions:',this.states[this.currentState])
+        for(let k in this.states[this.currentState].transitions){
+            // // console.log('transition key:',k)
+            if(this.satisfiesRequirements(inp, k)){
+                // console.log('FSM::updateState: found inp_key match with',k)//this.states[this.currentState].transitions[k]);
+                inp_key = k;
+                // console.log('Updating inp_key to',inp_key)
+                break
+            }
         }
 
-        else if(this.currentState == 'jogging'){
-            if(inp['w'] == false){
-                this.currentState = 'idle'
-            }
-            else{
-                if(inp['shift'] == true)
-                    this.currentState = 'running'
-                if(inp[' '] == true)
-                    this.currentState = 'jump_catch'
-            }
 
+        if(inp_key == null) return null;
+
+        // // console.log('reached here')
+
+        let next_state = this.states[this.currentState].transitions[inp_key]
+        let prev_state = this.currentState
+        this.currentState = next_state.state
+
+        let res = {
+            prev: prev_state,
+            next: this.currentState,
+            options: next_state.options
         }
 
-        else if(this.currentState == 'running'){
-            if(inp['w'] == false){
-                this.currentState = 'idle'
-            }
-            else{
-                if(inp['shift'] == false)
-                    this.currentState = 'jogging'
-                if(inp[' '] == true)
-                    this.currentState = 'jump_catch'
-            }
-        }
+        // // console.log('FSM::updateState: Returning:',res)
+
+        return res;
+
     }
+
+}
+
+
+class FSMState {
+    constructor(name){
+        this.name = name;
+        this.transitions = {};
+    }
+
+    _mergeOptions(options){
+        let res = {}
+        let params = [['start_time',0.0],['effectiveWeight',1.0],['crossFade',true],['crossFadeDuration',0.3],['crossFadeWarp',true]]
+
+        for(let param of params){
+            if(options[param[0]] != undefined) res[param[0]] = options[param[0]]
+            else res[param[0]] = param[1]
+        }
+
+        return res;
+    }
+
+    addTransition(req, next, options){
+        let opt = this._mergeOptions(options)
+        // let inp = standardizeInput(inp);
+        let inp_key = JSON.stringify(req)
+        this.transitions[inp_key] = {
+            state: next,
+            options: opt
+        };
+        // console.log('FSMState::addTransition: added transition:', this.transitions[inp_key]);
+
+    }
+
 
 }
 
 
 
 
-
 var PLAYER;
+const player_states = ['idle','jogging','running','forehand','vertical']
+const player_transitions = [
+    ['idle', {true: ['w'], false: []}, 'jogging'],
+    ['idle', {true: ['w','shift'], false: []}, 'running'],
+    ['idle', {true: [' '], false: ['w','shift']}, 'vertical'],
+    ['idle', {true: [' ','shift'], false: ['w']}, 'forehand'],
+
+    ['jogging', {true: ['w','shift'], false: []}, 'running'],
+    ['jogging', {true: ['w',' '], false: []}, 'vertical'],
+    ['jogging', {true: [], false: ['w']}, 'idle'],
+
+    ['running', {true: ['w'], false: ['shift']}, 'jogging'],
+    ['running', {true: [], false: ['w']}, 'idle'],
+
+    ['forehand', {true: [], false: ['shift']}, 'idle'],
+    ['forehand', {true: [], false: [' ']}, 'idle'],
+
+    ['vertical', {true: [], false: [' ']}, 'idle']
+
+
+
+]
+
+var bones = {};
 
 loadModel('mannequin', function(model){
-    PLAYER = new CharacterController(model)
+    PLAYER = new CharacterController(model, player_states)
 
-    for(let anim_path of ['idle','jump_catch','jogging','falling','running']){
+    for(let anim_path of player_states){
         loadAnimation(anim_path, function(path,anim){
             PLAYER.addAnimation(path,anim)
         })
     }
+
+    for(let trans of player_transitions){
+        let [prev, req, next] = trans;
+        // console.log('Prev:',prev,'Req:',req,'Next:',next)
+        PLAYER.addTransition(prev, req, next)
+    }
+
+    // console.log(PLAYER.entity)
+
+    let cur = [PLAYER.entity.children[1]];
+    while(cur.length > 0){
+        let bone = cur[0]
+        bones[bone.name] = bone;
+        cur = cur.slice(1);
+        for(let c of bone.children) cur.push(c)
+    }
+
+    // console.log('Bones:')
+    // console.log(bones)
 })
 
 
@@ -365,6 +572,13 @@ window.addEventListener( 'dblclick', onMouseClick, false );
  * Animate
  */
 
+
+ function setVector(a,b){
+     a.x = b.x
+     a.y = b.y
+     a.z = b.z
+     return a
+ }
  
 
 const clock = new THREE.Clock()
@@ -385,23 +599,43 @@ const tick = () =>
     //     onfield = true
     //     intersect = intersect[0]
     //     if (intersect.point.distanceTo(prevIntersect) > 0.2){
-    //         // console.log(intersect.point)
+    //         // // console.log(intersect.point)
     //         prevIntersect = intersect.point
     //     }
     // }
     // else onfield = false
 
-    // console.log(delta)
+    // // console.log(delta)
     // if (mixer) mixer.update(0.0005);
 
     // Render
     try{
         PLAYER.mixer.update(0.02)
-        PLAYER.update()}
-    catch(e){console.log(e)}
+        PLAYER.update();
+
+
+        let right_hand_pos = PLAYER.entity.children[1].children[1].children[0].children[0].children[2].children[0].children[0].children[0].position
+        let [x,y,z] = [right_hand_pos.x,right_hand_pos.y,right_hand_pos.z]
+
+        let bone = 'mixamorig1RightHandMiddle1'
+
+        // DISC.position.x = bones[bone].x
+
+        bones[bone].getWorldPosition(DISC.position)
+        // DISC.position.x = PLAYER.entity.children[1].position.x/20
+        // // console.log(Math.round(x*1000000))
+
+        // // console.log(Math.round(PLAYER.entity.children[1].position.x),Math.round(PLAYER.entity.children[1].children[1].position.x))
+
+        // DISC.position.x = x*1000000;
+        // // console.log(PLAYER.entity.children[1].position.x,PLAYER.entity.children[1].position.y,PLAYER.entity.children[1].position.z)
+    }
+    catch(e){}
     controls.update()
     try{renderer.render(scene, PLAYER.camera.camera)}
     catch(e){renderer.render(scene, camera)}
+
+
     
 
 
