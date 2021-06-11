@@ -48,32 +48,26 @@ const sizes = {
     height: window.innerHeight
 }
 
+const init_width = window.innerWidth
+const init_height = window.innerHeight
+// console.log(init_width, init_height)
 
 // Lights
 
-// const pointLight = new THREE.PointLight(0xffffff, 0.1)
-// pointLight.position.x = 2
-// pointLight.position.y = 3
-// pointLight.position.z = 4
-// scene.add(pointLight)
-// pointLight.castShadow = true
+const directionalLight = new THREE.DirectionalLight(0xffffff, 1)
+directionalLight.position.set(-100,100,0)
 
-const blueLight = new THREE.DirectionalLight(0xffffff, 2)
-blueLight.position.x = 10
-blueLight.position.y = 20
-blueLight.position.z = 10
-scene.add(blueLight)
+directionalLight.castShadow = true;
+directionalLight.shadow.camera.top = 500;
+directionalLight.shadow.camera.left = 500;
+directionalLight.shadow.camera.bottom = -500;
+directionalLight.shadow.camera.right = -500;
 
-blueLight.castShadow = true
+directionalLight.shadow.mapSize.set(4096,4096)
 
-const d = 80;
+scene.add(directionalLight)
 
-blueLight.shadow.camera.left = - d;
-blueLight.shadow.camera.right = d;
-blueLight.shadow.camera.top = d;
-blueLight.shadow.camera.bottom = - d;
-
-const hemisphereLight = new THREE.HemisphereLight( 0x8eba20, 0xffffff, 1 );
+const hemisphereLight = new THREE.HemisphereLight( 0xffffff, 0xffffff, 0.8 );
 scene.add( hemisphereLight );
 
 /**
@@ -143,33 +137,87 @@ function loadAnimation(anim_path, callback){
 
 
 
-
 class ThirdPersonCamera {
     constructor(controller){
         this.controller = controller;
         this.camera = new THREE.PerspectiveCamera(60, sizes.width / sizes.height, 0.1, 1000)
         this.camera.position.y = 15
-        this.centerAt = new Vector3()
+        scene.add(this.camera)
 
-        this.speed_bar = new THREE.Mesh(new THREE.PlaneBufferGeometry(3,0.4), new THREE.MeshBasicMaterial({color: 'black'}))
-        this.speed_amt = new THREE.Mesh(new THREE.PlaneBufferGeometry(1,0.3), new THREE.MeshBasicMaterial({color: 'green'}))
-        
-        scene.add(this.speed_bar);
-        scene.add(this.speed_amt);
 
-        this.angle_bar = new THREE.Mesh(new THREE.PlaneBufferGeometry(3,0.4), new THREE.MeshBasicMaterial({color: 'black'}))
-        this.angle_amt = new THREE.Mesh(new THREE.PlaneBufferGeometry(1,0.3), new THREE.MeshBasicMaterial({color: 'red'}))
-        
-        scene.add(this.angle_bar);
-        scene.add(this.angle_amt);
+        this.tot_w = 0.22 * init_width / 1920
+        this.tot_h = 0.11 * init_height / 981
 
-        // offset
 
-        // player's direction = rotation.y
-        // 0 --> z:1, x:0
-        // pi/2 --> z:0, x:1
-        // ...
+        this.speed_bar = this.createHUD({type: 'plane', width: 20, height: 2}, new THREE.MeshBasicMaterial({color:'black'}), {x:0,y:2})
+        this.speed_amt = this.createHUD({type: 'plane', width: 19.5, height: 1.5}, new THREE.MeshBasicMaterial({color:'green'}), {x:0.25,y:1.75})
+
+
+
+        this.test_circle = this.createHUD({type: 'circle', radius: 20, angle: 10}, new THREE.MeshBasicMaterial({color:'blue'}),{x:0,y:4})
+
     }
+
+    createHUD(dim, mat, pos){       // format: dim = {type, width: w%, height: h%}, pos = {x,y} (for top-left corner)
+        let mesh, center;
+        if(dim.type == 'plane'){
+            let w = dim.width * this.tot_w / 100
+            let h = dim.height * this.tot_h / 100
+            mesh = new THREE.Mesh(new THREE.PlaneBufferGeometry(w,h), mat);
+            center = true;
+        }
+        else if(dim.type == 'circle'){
+            // mesh = new THREE.Mesh(new THREE.CircleGeometry(0.001), new THREE.LineBasicMaterial())
+            // mesh.position.set(0,0,-0.1)
+            center = false;
+            let geometry = new THREE.CircleGeometry( dim.radius * this.tot_w/100, 64, 0, dim.angle);
+            mesh = new THREE.Mesh( geometry, mat );
+
+        }
+        this.camera.add(mesh);
+        mesh.position.set(0,0,-0.1)
+        // console.log(mesh)
+        this.placeHUD(mesh, pos, center);
+
+        return mesh;
+    }
+
+    placeHUD(mesh, screen_loc, center=true){
+        // screen_loc = (x,y) as %
+
+        // x: 0% = -0.11 for the left end
+        //  100% = +0.11 for the right end
+
+        // console.log('mesh params:',w,h)
+
+        let final_x = -0.11 + screen_loc.x * 0.22 / 100 //+ w/2
+        let final_y = -0.055 + screen_loc.y * 0.11 / 100 //- h/2
+
+        // console.log('final:',final_x,final_y)
+
+
+        
+        if(center){
+            let w = mesh.geometry.parameters.width
+            let h = mesh.geometry.parameters.height
+
+            let ws = mesh.scale.x
+            let hs = mesh.scale.y
+
+
+            mesh.position.x = final_x * init_width / 1920 + w*ws/2
+            mesh.position.y = final_y * init_height / 981 - h*hs/2
+        }
+        else{
+            mesh.position.x = final_x * init_width / 1920
+            mesh.position.y = final_y * init_height / 981
+        }
+
+        
+
+    }
+
+
 
     update(obj){
         let rot = obj.rotation.y;
@@ -178,40 +226,27 @@ class ThirdPersonCamera {
         // // console.log(x_comp,z_comp)
 
         let bone = 'mixamorig1Hips'
-        this.camera.position.x = bones[bone].getWorldPosition(new Vector3).x - 20*x_comp;
-        this.camera.position.z = bones[bone].getWorldPosition(new Vector3).z - 20*z_comp;
+        // this.camera.position.x = bones[bone].getWorldPosition(new Vector3).x - 20*x_comp;
+        this.camera.position.x = obj.position.x - 20*x_comp;
+        // this.camera.position.z = bones[bone].getWorldPosition(new Vector3).z - 20*z_comp;
+        this.camera.position.z = obj.position.z - 20*z_comp;
 
         this.camera.lookAt(obj.position.x + 20*x_comp, 0, obj.position.z + 20*z_comp)
 
-        setVector(this.speed_bar.position, this.camera.position)
-        setVector(this.speed_bar.rotation, this.camera.rotation)
-        this.speed_bar.translateZ(-10);
-        this.speed_bar.translateY(-4);
+        // console.log(this.camera.position.x, this.speed_bar.position.x)
 
-        setVector(this.speed_amt.position, this.camera.position)
-        setVector(this.speed_amt.rotation, this.camera.rotation)
-        this.speed_amt.translateZ(-9.9);
-        this.speed_amt.translateY(-3.96);
+        this.speed_amt.scale.x = this.controller.throw_speed / 3;
 
+        this.placeHUD(this.speed_amt, {x:0.25,y:1.75})
+        
 
-        setVector(this.angle_bar.position, this.camera.position)
-        setVector(this.angle_bar.rotation, this.camera.rotation)
-        this.angle_bar.translateZ(-10);
-        this.angle_bar.translateY(-5);
+        let tl = disc_flight_params.theta * Math.PI/180
+        if(tl != this.test_circle.geometry.parameters.thetaLength){
+            // console.log('changing to',tl)
+            this.camera.remove(this.test_circle)
+            this.test_circle = this.createHUD({type: 'circle', radius: 20, angle: tl}, new THREE.MeshBasicMaterial({color:'blue'}),{x:0,y:4})
+        }
 
-        setVector(this.angle_amt.position, this.camera.position)
-        setVector(this.angle_amt.rotation, this.camera.rotation)
-        this.angle_amt.translateZ(-9.9);
-        this.angle_amt.translateY(-4.96);
-
-        // let sx = this.speed_bar.scale.x
-        let sp = this.controller.throw_speed
-        this.speed_amt.scale.set(sp,1,1)
-
-
-        let an = disc_flight_params.theta * 3 / 90
-        this.angle_amt.scale.set(an,1,1)
-        // console.log(this.speed_bar.scale)
     }
 
 }
@@ -234,7 +269,7 @@ class CharacterController {
 
         this.FSM = new FiniteStateMachine(this, states)
 
-        this.throw_speed = 1;
+        this.throw_speed = 0;
 
 
         this.velocity = 0;
@@ -266,7 +301,15 @@ class CharacterController {
     processInput(inp){
 
         if (inp['ShiftRight'] == true){
-            this.throw_speed = (this.throw_speed + 0.05) % 3;
+            this.throw_speed = Math.min(this.throw_speed + 0.05, 3);
+        }
+
+        else{
+            if(this.throw_speed > 0.01 && DISC.inHand == true){
+                DISC.throw();
+            }
+            else
+                this.throw_speed = 0.01;
         }
 
         if (inp['ShiftLeft'] == true){
@@ -935,6 +978,7 @@ class DiscEntity {
             if(P.y < 0.5){
                 this.inHand = true;
                 // this.mesh.position.set(0,5,0)
+                console.log('ended with vy:',this.velocity.y)
                 this.velocity.set(0,0,0);
             }
 
@@ -946,7 +990,7 @@ class DiscEntity {
         
     }
 
-    throw(start_pos = new Vector3(0,5,0), direction = PLAYER.entity.rotation, speed = 10 * PLAYER.throw_speed, y_force = 5){
+    throw(start_pos = new Vector3(0,5,0), direction = PLAYER.entity.rotation, speed = 10 * PLAYER.throw_speed, y_force = 10){
         console.log('throwing')
         let angle = direction.y;
         let x_comp = Math.sin(angle)
@@ -1013,6 +1057,8 @@ window.addEventListener('resize', () =>
     // Update sizes
     sizes.width = window.innerWidth
     sizes.height = window.innerHeight
+
+    console.log('new width:',sizes.width)
 
     // Update camera
     camera.aspect = sizes.width / sizes.height
