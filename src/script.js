@@ -6,7 +6,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import * as dat from 'dat.gui'
 import gsap from 'gsap'
-import { AnimationMixer, Vector3 } from 'three'
+import { AnimationMixer, Vector2, Vector3 } from 'three'
 
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js'
@@ -731,20 +731,24 @@ loadModel('mannequin', function(model){
 
 var disc_flight_params = {
     C1: 0.25,
-    C2: 0.1,
+    C2: 3,
+    C3: -5,
     theta: 0,
     forceY: 7,
     forceX: -15,
     forceZ: 0,
-    g: -9.8,
+    AOT: Math.PI/8,
+    g: -7,
     throw_direction_x: -1,
     throw_direction_z: 0,
     time: 0.05
 }
 
 gui.add(disc_flight_params, 'C1').min(0.0)
-gui.add(disc_flight_params, 'C2').min(0)
+gui.add(disc_flight_params, 'C2')
+gui.add(disc_flight_params, 'C3')
 gui.add(disc_flight_params, 'theta').min(0.0).max(90)
+gui.add(disc_flight_params, 'AOT').min(-Math.PI/2).max(Math.PI/2)
 gui.add(disc_flight_params, 'forceX').min(-30.0).max(30.0)
 gui.add(disc_flight_params, 'forceY').min(-5.0).max(40.0)
 gui.add(disc_flight_params, 'forceZ').min(-30.0).max(30.0)
@@ -774,6 +778,8 @@ class DiscEntity {
 
         this.throw_x = 0;
         this.throw_z = 0;
+
+        this.throw_side = 0;
 
         // State
 
@@ -835,6 +841,11 @@ class DiscEntity {
 
             let AOI = this.angle_of_incidence;
             let AOM = this.velocity.angleTo(new Vector3(v.x, 0, v.z))
+
+            let AOT = disc_flight_params.AOT           // angle of tilt
+
+
+
 
             if(v.y < 0) AOM *= -1;
 
@@ -898,6 +909,9 @@ class DiscEntity {
             let drag = d1 + d2;
 
 
+
+
+
             // console.log('Lift: ',lift - disc_flight_params.g, 'Drag: ',drag)
             // console.log('AOM:',AOM*180/Math.PI,'F speed:',Math.sqrt(v.x*v.x+v.z+v.z), 'U speed:', v.y, 'Lift:',lift,'Drag:',drag,'Upwards F:',lift-9.8)
 
@@ -909,12 +923,19 @@ class DiscEntity {
             // for now, no Z velocity;
 
 
-            let x_sign = this.throw_x >= 0 ? 1 : -1
-            V.x = v.x - (drag * t) * this.throw_x;
-            let z_sign = this.throw_z >= 0 ? 1 : -1
-            V.z = v.z - (drag * t) * this.throw_z;
+            // let x_sign = this.throw_x >= 0 ? 1 : -1
+            // let z_sign = this.throw_z >= 0 ? 1 : -1
+            // V.z = v.z - (drag * t) * this.throw_z;
 
-            // console.log('Drag:',drag,'Lift:',lift);
+            let translation = disc_flight_params.C2 * sin(AOT);
+
+            let side_x_comp = -this.throw_z;
+            let side_z_comp = this.throw_x;
+
+            this.throw_side += translation * t;
+
+            V.x = v.x - ( (drag * t) * this.throw_x ) //+ ( this.throw_side * side_x_comp);
+            V.z = v.z - ( (drag * t) * this.throw_z ) //+ ( this.throw_side * side_z_comp);
 
 
             // console.log('Upward Force:',lift - disc_flight_params.g);
@@ -950,9 +971,9 @@ class DiscEntity {
 
 
 
-            P.x = (p.x + (V.x * t));
+            P.x = (p.x + (V.x * t) + this.throw_side * t * side_x_comp);
             P.y = (p.y + (V.y * t));
-            P.z = (p.z + (V.z * t));
+            P.z = (p.z + (V.z * t) + this.throw_side * t * side_z_comp);
 
             // console.log('old position:',p.x,p.y,p.z)
             // console.log('new position:',P.x,P.y,P.z)
@@ -972,7 +993,18 @@ class DiscEntity {
             look_vector.y += this.mesh.position.y
             look_vector.z += this.mesh.position.z
 
+            // add side vector based on AOT
+
+            // change lookvactor's X-Z values by moving them to the side
+            let side_look = Math.tan(AOT);
+            look_vector.x += side_look * side_x_comp
+            look_vector.z += side_look * side_z_comp
+
             this.mesh.lookAt(look_vector)
+            // this.mesh.rotateOnAxis(new Vector3(0,1,1).normalize(), -AOT)
+            // this.mesh.rotation.set(Math.PI/2,Math.PI/2,0)
+
+            // this.mesh.rotation.y = Math.PI/2
 
 
             if(P.y < 0.5){
@@ -990,7 +1022,7 @@ class DiscEntity {
         
     }
 
-    throw(start_pos = new Vector3(0,5,0), direction = PLAYER.entity.rotation, speed = 10 * PLAYER.throw_speed, y_force = 10){
+    throw(start_pos = new Vector3(0,5,0), direction = PLAYER.entity.rotation, speed = 10 * PLAYER.throw_speed, y_force = disc_flight_params.forceY){
         console.log('throwing')
         let angle = direction.y;
         let x_comp = Math.sin(angle)
@@ -1006,7 +1038,7 @@ class DiscEntity {
 
         this.inHand = false;
 
-        this.mesh.rotation.set(-Math.PI/2,0,0)
+        // this.mesh.rotation.set(-Math.PI/2,0,Math.PI/2)
         if(this.velocity.x == 0 && this.velocity.z == 0){
             this.throw_x = disc_flight_params.throw_direction_x;
             this.throw_z = disc_flight_params.throw_direction_z;
@@ -1021,10 +1053,41 @@ class DiscEntity {
 
         console.log('throwing to:',this.throw_x,this.throw_z)
 
+        let sign = disc_flight_params.AOT > 0 ? 1 : -1;
+        this.throw_side = disc_flight_params.C3 * sign;
+
+        // this.mesh.rotation.z = Math.PI/4
+    }
+
+
+    getArc(){
+        let ang = -PLAYER.entity.rotation.y + Math.PI/2;
         
-        
+        // console.log('Init angle:',ang)
+
+        let res = {}
+        let i=0;
+        arcPoints = [];
+        for(let t = ang - 5*Math.PI/12; t <= ang + 5*Math.PI/12; t += Math.PI/48){
+            // console.log('computing for angle:',(t-ang)*180/Math.PI)
+            let v = new Vector2(cos(t),sin(t)).multiplyScalar(10);
+            let v3 = new Vector3(v.x,0,v.y).add(this.mesh.position);
+            // console.log(v3)
+            res[t-ang] = screenXY(v3,PLAYER.camera.camera)
+
+            arcPoints[i] = v3;
+            i++;
+        }
+        return res;
     }
 }
+
+var arcPoints = []
+
+var arcGeometry = new THREE.BufferGeometry().setFromPoints(arcPoints);
+var arcLine = new THREE.Line(arcGeometry, new THREE.LineBasicMaterial())
+scene.add(arcLine)
+// arcLine.geometry.attributes.position.needsUpdate = true;
 
 var DISC;
 
@@ -1035,7 +1098,57 @@ document.addEventListener('keydown', e => {
     else if(e.key == '1'){
         PLAYER.animations['throw_disc_forehand'].play();
     }
+    else if(e.key == 'r'){
+        DISC.inHand = true;
+        DISC.velocity.set(0,0,0);
+    }
+    else if(e.key == 'p'){
+        let discscreen = screenXY(DISC.mesh.position, PLAYER.camera.camera)
+        console.log('Mouse:',screenMouse.x,screenMouse.y)
+        console.log('Disc:',discscreen.x,discscreen.y)
+    }
+    else if(e.key == 'g'){
+        computeArc()
+    }
+    else if(e.key == 'l'){
+        arcPoints[0].x += 1
+        console.log(arcPoints)
+        scene.remove(arcLine)
+        arcGeometry = new THREE.BufferGeometry().setFromPoints(arcPoints)
+        arcLine = new THREE.Line(arcGeometry,new THREE.LineBasicMaterial());
+        scene.add(arcLine)
+
+    }
 })
+
+function computeArc(){
+    let res = DISC.getArc();
+    // console.log(res);
+    let tar = screenMouse.x;
+    // console.log('Target:',tar)
+    let ans;
+    let min = Infinity;
+    let ind;
+    let i=0;
+    for(let ang in res){
+        // console.log(ang,res[ang])
+        if(min > Math.abs(res[ang].x - tar)){
+            min = Math.abs(res[ang].x - tar)
+            ans = ang
+            ind = i;
+        }
+        i++;
+    }
+    arcPoints[ind].y += (mouse.y) * 20
+    // console.log('Index:',ind,arcPoints.map(x=>x.y))
+    arcPoints = [DISC.mesh.position, arcPoints[ind]];
+    scene.remove(arcLine)
+    arcGeometry = new THREE.BufferGeometry().setFromPoints(arcPoints)
+    arcLine = new THREE.Line(arcGeometry,new THREE.LineBasicMaterial());
+    scene.add(arcLine)
+
+    // console.log('Angle:',ans * 180 / Math.PI)
+}
 
 document.addEventListener('keyup', e => {
     if(e.key == '2'){
@@ -1043,7 +1156,7 @@ document.addEventListener('keyup', e => {
     }
 })
 
-loadModel('disc', function(model){
+loadModel('disc1', function(model){
     // model.scale.set(0.05,0.05,0.05);
     DISC = new DiscEntity(model);
 })
@@ -1072,6 +1185,8 @@ window.addEventListener('resize', () =>
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
+const screenMouse = new THREE.Vector2();
+
 function onMouseMove( event ) {
 
 	// calculate mouse position in normalized device coordinates
@@ -1080,6 +1195,10 @@ function onMouseMove( event ) {
 	mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
 	mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
 
+    screenMouse.x = event.clientX;
+    screenMouse.y = event.clientY;
+
+    
 }
 
 function onMouseClick( event ) {
@@ -1106,24 +1225,18 @@ const clock = new THREE.Clock()
 let prev = 0
 let onfield = false
 let prevIntersect = new Vector3(0,0,0)
+
+
 const tick = () =>
 {
 
     const elapsedTime = clock.getElapsedTime()
 
-    raycaster.setFromCamera( mouse, camera );
+    // try{raycaster.setFromCamera( mouse, PLAYER.camera.camera );}
+    // catch(e){raycaster.setFromCamera( mouse, camera );}
 
 	// // calculate objects intersecting the picking ray
-	// var intersect = raycaster.intersectObject(plane.mesh)
-
-    // if (intersect.length > 0){
-    //     onfield = true
-    //     intersect = intersect[0]
-    //     if (intersect.point.distanceTo(prevIntersect) > 0.2){
-    //         // // console.log(intersect.point)
-    //         prevIntersect = intersect.point
-    //     }
-    // }
+	
     // else onfield = false
 
     // // console.log(delta)
@@ -1135,6 +1248,12 @@ const tick = () =>
         PLAYER.update();
 
         DISC.update()
+
+        if(DISC.inHand == true){
+            computeArc()
+        }
+
+        
     }
     catch(e){console.log(e)}
     controls.update()
@@ -1150,3 +1269,28 @@ const tick = () =>
 }
 
 tick()
+
+
+
+function screenXY(obj,camera){
+
+    var vector = obj.clone();
+    var windowWidth = window.innerWidth;
+    var minWidth = 1280;
+  
+    if(windowWidth < minWidth) {
+      windowWidth = minWidth;
+    }
+  
+    var widthHalf = (windowWidth/2);
+    var heightHalf = (window.innerHeight/2);
+  
+    vector.project(camera);
+  
+    vector.x = parseInt(( vector.x * widthHalf ) + widthHalf);
+    vector.y = parseInt(- ( vector.y * heightHalf ) + heightHalf);
+    vector.z = 0;
+  
+    return vector;
+  
+  };
