@@ -1,4 +1,5 @@
-// const socket = io("http://192.168.0.105:8080");
+// import io from 'socket.io-client/dist/socket.io';
+// const socket = io("http://localhost:9000");
 
 
 import './style.css'

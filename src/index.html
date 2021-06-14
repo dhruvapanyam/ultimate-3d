@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ThreeJS Starter</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.dev.js"></script>
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.dev.js"></script> -->
     <!-- <link rel="shortcut icon" href="favicon.ico"> -->
+    <script src="/socket.io/socket.io.js"></script>
+
 </head>
 <body>
     <canvas class="webgl"></canvas>
@@ -20,3 +22,8 @@
         cursor: none;
     }
 </style>
+
+
+<script>
+    const socket = io("http://localhost:8000");
+</script>
