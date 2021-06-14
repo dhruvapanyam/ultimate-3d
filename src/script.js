@@ -152,6 +152,8 @@ class ThirdPersonCamera {
         this.speed_bar = this.createHUD({type: 'plane', width: 20, height: 2}, new THREE.MeshBasicMaterial({color:'black'}), {x:0,y:2})
         this.speed_amt = this.createHUD({type: 'plane', width: 19.5, height: 1.5}, new THREE.MeshBasicMaterial({color:'green'}), {x:0.25,y:1.75})
 
+        this.AOT = this.createHUD({type: 'plane', width: 10, height: 1}, new THREE.MeshBasicMaterial({color: 'black'}), {x:0,y:50})
+
 
 
         this.test_circle = this.createHUD({type: 'circle', radius: 20, angle: 10}, new THREE.MeshBasicMaterial({color:'blue'}),{x:0,y:4})
@@ -247,6 +249,15 @@ class ThirdPersonCamera {
             this.test_circle = this.createHUD({type: 'circle', radius: 20, angle: tl}, new THREE.MeshBasicMaterial({color:'blue'}),{x:0,y:4})
         }
 
+        if(this.controller.input.keys[keys.q] == true){
+            THROW.AOT = Math.max(-Math.PI/3,THROW.AOT-0.01)
+        }
+        else if(this.controller.input.keys[keys.r] == true){
+            THROW.AOT = Math.min(Math.PI/3,THROW.AOT+0.01)
+        }
+
+        this.AOT.rotation.z = -THROW.AOT;
+
     }
 
 }
@@ -300,7 +311,7 @@ class CharacterController {
 
     processInput(inp){
 
-        if (inp['ShiftRight'] == true){
+        if (inp['Space'] == true){
             this.throw_speed = Math.min(this.throw_speed + 0.05, 3);
         }
 
@@ -418,7 +429,7 @@ class CharacterControllerInput {
     constructor(controller){
         this.controller = controller
         this.keys = {}
-        let inp_keys = ['KeyQ','KeyW','KeyE','KeyA','KeyS','KeyD','KeyH','KeyJ','Space','ShiftLeft','ShiftRight','ArrowUp','ArrowDown','ArrowLeft','ArrowRight']
+        let inp_keys = ['KeyQ','KeyW','KeyE','KeyR','KeyA','KeyS','KeyD','KeyH','KeyJ','Space','ShiftLeft','ShiftRight','ArrowUp','ArrowDown','ArrowLeft','ArrowRight']
         // let inp_keys = ['q','w','e','a','s','d','h','j',' ','shift','arrowup','arrowdown','arrowleft','arrowright']
         for(let inp of inp_keys) this.keys[inp] = false;
 
@@ -632,6 +643,7 @@ const keys = {
     q: 'KeyQ',
     w: 'KeyW',
     e: 'KeyE',
+    r: 'KeyR',
     space: 'Space',
     Lshift: 'ShiftLeft',
     Rshift: 'ShiftRight',
@@ -666,8 +678,8 @@ const player_states = {
 const player_transitions = [
     ['idle', {true: [keys.up], false: []}, 'jogging'],
     ['idle', {true: [keys.up,keys.Lshift], false: []}, 'running'],
-    ['idle', {true: [keys.space], false: [keys.up,keys.Lshift]}, 'idle_vertical'],
-    ['idle', {true: [keys.space,keys.Lshift], false: [keys.up]}, 'throwing_disc_forehand'],
+    // ['idle', {true: [keys.space], false: [keys.up,keys.Lshift]}, 'idle_vertical'],
+    // ['idle', {true: [keys.space,keys.Lshift], false: [keys.up]}, 'throwing_disc_forehand'],
 
     ['jogging', {true: [keys.up,keys.Lshift], false: []}, 'running'],
     ['jogging', {true: [keys.up,keys.space], false: []}, 'jogging_vertical'],
@@ -682,10 +694,10 @@ const player_transitions = [
     ['holding_disc_center', {true: [keys.j], false: [keys.q,keys.e]}, 'idle'],
     
     ['holding_disc_center', {true: [keys.e], false: []}, 'holding_disc_forehand'],
-    ['holding_disc_center', {true: [keys.q], false: []}, 'holding_disc_backhand'],
+    ['holding_disc_center', {true: [keys.w], false: []}, 'holding_disc_backhand'],
     
     ['holding_disc_forehand', {true: [], false: [keys.e]}, 'holding_disc_center'],
-    ['holding_disc_backhand', {true: [], false: [keys.q]}, 'holding_disc_center'],
+    ['holding_disc_backhand', {true: [], false: [keys.w]}, 'holding_disc_center'],
 
     ['holding_disc_forehand', {true: [keys.space], false: []}, 'throwing_disc_forehand'],
     ['throwing_disc_forehand', {true: [], false: [keys.space]}, 'holding_disc_forehand'],
@@ -754,6 +766,35 @@ gui.add(disc_flight_params, 'forceY').min(-5.0).max(40.0)
 gui.add(disc_flight_params, 'forceZ').min(-30.0).max(30.0)
 gui.add(disc_flight_params, 'g').min(-20).max(-5)
 gui.add(disc_flight_params, 'time').min(0.001).max(0.1)
+
+
+
+
+var THROW = {
+    direction: 0,       // angle on XZ plane
+    forward_speed: 1,   // horizontal component
+    upward_speed: 1,    // vertical component
+    AOI: 0,
+    AOT: 0
+}
+
+function updateThrowDetails(data){
+    if(data.direction != undefined){
+        THROW.direction = data.direction;
+    }
+    if(data.forward_speed != undefined){
+        THROW.forward_speed = data.forward_speed;
+    }
+    if(data.upward_speed != undefined){
+        THROW.upward_speed = data.upward_speed;
+    }
+    if(data.AOI != undefined){
+        THROW.AOI = data.AOI;
+    }
+    if(data.AOT != undefined){
+        THROW.AOT = data.AOT;
+    }
+}
 
 
 class DiscEntity {
@@ -842,7 +883,7 @@ class DiscEntity {
             let AOI = this.angle_of_incidence;
             let AOM = this.velocity.angleTo(new Vector3(v.x, 0, v.z))
 
-            let AOT = disc_flight_params.AOT           // angle of tilt
+            let AOT = THROW.AOT           // angle of tilt
 
 
 
@@ -1022,11 +1063,17 @@ class DiscEntity {
         
     }
 
-    throw(start_pos = new Vector3(0,5,0), direction = PLAYER.entity.rotation, speed = 10 * PLAYER.throw_speed, y_force = disc_flight_params.forceY){
+    throw(speed = 10 * PLAYER.throw_speed){
         console.log('throwing')
-        let angle = direction.y;
-        let x_comp = Math.sin(angle)
-        let z_comp = Math.cos(angle)
+
+        let throw_data = computeArc();
+
+        let angle = throw_data.direction;
+        let y_force = throw_data.y;
+
+
+        let x_comp = Math.cos(angle)
+        let z_comp = Math.sin(angle)
 
         this.angle_of_incidence = disc_flight_params.theta * Math.PI / 180;
 
@@ -1053,8 +1100,14 @@ class DiscEntity {
 
         console.log('throwing to:',this.throw_x,this.throw_z)
 
-        let sign = disc_flight_params.AOT > 0 ? 1 : -1;
-        this.throw_side = disc_flight_params.C3 * sign;
+        let init_angle = throw_data.init;
+
+        // let side_velocity = Math.sin(init_angle - )
+
+        // let sign = disc_flight_params.AOT > 0 ? 1 : -1;
+        // this.throw_side = disc_flight_params.C3 * sign;
+
+        this.throw_side = 0;
 
         // this.mesh.rotation.z = Math.PI/4
     }
@@ -1073,12 +1126,15 @@ class DiscEntity {
             let v = new Vector2(cos(t),sin(t)).multiplyScalar(10);
             let v3 = new Vector3(v.x,0,v.y).add(this.mesh.position);
             // console.log(v3)
-            res[t-ang] = screenXY(v3,PLAYER.camera.camera)
+            res[t] = screenXY(v3,PLAYER.camera.camera)
 
             arcPoints[i] = v3;
             i++;
         }
-        return res;
+        return {
+            init: ang,
+            res: res
+        };
     }
 }
 
@@ -1098,7 +1154,7 @@ document.addEventListener('keydown', e => {
     else if(e.key == '1'){
         PLAYER.animations['throw_disc_forehand'].play();
     }
-    else if(e.key == 'r'){
+    else if(e.key == 'o'){
         DISC.inHand = true;
         DISC.velocity.set(0,0,0);
     }
@@ -1107,22 +1163,19 @@ document.addEventListener('keydown', e => {
         console.log('Mouse:',screenMouse.x,screenMouse.y)
         console.log('Disc:',discscreen.x,discscreen.y)
     }
-    else if(e.key == 'g'){
-        computeArc()
-    }
-    else if(e.key == 'l'){
-        arcPoints[0].x += 1
-        console.log(arcPoints)
-        scene.remove(arcLine)
-        arcGeometry = new THREE.BufferGeometry().setFromPoints(arcPoints)
-        arcLine = new THREE.Line(arcGeometry,new THREE.LineBasicMaterial());
-        scene.add(arcLine)
-
-    }
+    // else if(e.key == 'q'){
+    //     THROW.AOT += 0.1
+    // }
+    // else if(e.key == 'r'){
+    //     THROW.AOT -= 0.1
+    // }
 })
 
 function computeArc(){
-    let res = DISC.getArc();
+    let arc = DISC.getArc();
+
+    let init_angle = arc.init;
+    let res = arc.res;
     // console.log(res);
     let tar = screenMouse.x;
     // console.log('Target:',tar)
@@ -1139,13 +1192,24 @@ function computeArc(){
         }
         i++;
     }
-    arcPoints[ind].y += (mouse.y) * 20
+    let y_change = (res[ans].y - screenMouse.y) * 0.04;
+    y_change = Math.min(y_change, 15);
+    y_change = Math.max(y_change, -3);
+
+    arcPoints[ind].y += y_change;
+
     // console.log('Index:',ind,arcPoints.map(x=>x.y))
-    arcPoints = [DISC.mesh.position, arcPoints[ind]];
+    // arcPoints = [DISC.mesh.position, arcPoints[ind]];
     scene.remove(arcLine)
     arcGeometry = new THREE.BufferGeometry().setFromPoints(arcPoints)
     arcLine = new THREE.Line(arcGeometry,new THREE.LineBasicMaterial());
     scene.add(arcLine)
+
+    return {
+        direction: ans,
+        y: y_change,
+        init: init_angle
+    }
 
     // console.log('Angle:',ans * 180 / Math.PI)
 }
