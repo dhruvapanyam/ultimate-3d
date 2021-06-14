@@ -5,7 +5,8 @@
     "build": "webpack --config ./bundler/webpack.prod.js",
     "dev:client": "webpack serve --config ./bundler/webpack.dev.js",
     "dev:server": "nodemon",
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\""
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "start": "node index.js"
   },
   "dependencies": {
     "@babel/core": "^7.13.1",

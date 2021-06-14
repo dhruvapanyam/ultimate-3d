@@ -1,5 +1,6 @@
-// import io from 'socket.io-client/dist/socket.io';
-// const socket = io("http://localhost:9000");
+import io from 'socket.io-client';
+console.log(process.env.NODE_ENV)
+const socket = process.env.NODE_ENV === 'production' ? io() : io('http://localhost:8000');
 
 
 import './style.css'

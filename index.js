@@ -13,13 +13,14 @@ const io = socketIo(server, {
     }
 });
  
-if(process.env.NODE_ENV === 'production') {
-    app.use(express.static(path.join(__dirname, 'client/build')));
-}
-else {
-    app.use(express.static(path.join(__dirname, 'client/public')));
-}
+if(process.env.NODE_ENV === 'production')
+    app.use(express.static(path.join(__dirname, 'dist')));
+
  
 app.use(cors());
+
+io.on('connection', (socket) => {
+    console.log(`${socket.id} connected`)
+})
 
 server.listen(8000, ()=>{console.log('Listening on port 8000...')})
