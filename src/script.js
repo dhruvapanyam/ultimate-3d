@@ -1977,3 +1977,8 @@ window.addEventListener('wheel', e => {
             // THROW.AOT = Math.min(Math.PI/3,THROW.AOT + 0.2)
     }
 })
+
+setInterval(()=>{
+    if(PLAYER.entity != undefined && PLAYER_ID != undefined)
+            socket.emit('playerPosition',{id:PLAYER_ID,position:PLAYER.entity.position})
+},1000)
