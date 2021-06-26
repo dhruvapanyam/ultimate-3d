@@ -142,7 +142,7 @@ function loadModel(model_path, callback){
     fbxLoader.load(
         './models/'+model_path+'.fbx',
         function(obj){
-            console.log(model_path,obj)
+            // console.log(model_path,obj)
             obj.scale.set(0.05,0.05,0.05)
             obj.traverse(node=>{if(node.isMesh){node.castShadow=true;node.receiveShadow=true;}})
             callback(obj)
@@ -154,7 +154,7 @@ function loadAnimation(anim_path, callback){
     fbxLoader.load(
         './models/animations/'+anim_path+'.fbx',
         function(obj){
-            console.log('loadAnimation:',anim_path,obj)
+            // console.log('loadAnimation:',anim_path,obj)
             if(anim_path == 'mannequin/throw_back')
                 callback(anim_path, obj.animations[1])
             else
@@ -208,7 +208,7 @@ class ThirdPersonCamera {
         this.minimap_disc.position.set(0,0,0)
         this.minimap.add(this.minimap_disc)
        
-        console.log(this.minimap)
+        // console.log(this.minimap)
 
         this.HUD_objects = {speed:this.speed_bar, speedamt:this.speed_amt, aot:this.AOT, aoi:this.AOI}//, mini:this.minimap, mini1:this.minimap_inner[0],mini2:this.minimap_inner[1],mini3:this.minimap_inner[2]};
         for(let obj in this.HUD_objects){
@@ -236,7 +236,7 @@ class ThirdPersonCamera {
         }
         this.camera.add(mesh);
         mesh.position.set(0,0,-0.1)
-        // console.log(mesh)
+        // // console.log(mesh)
         this.placeHUD(mesh, pos, center);
 
         return mesh;
@@ -248,12 +248,12 @@ class ThirdPersonCamera {
         // x: 0% = -0.11 for the left end
         //  100% = +0.11 for the right end
 
-        // console.log('mesh params:',w,h)
+        // // console.log('mesh params:',w,h)
 
         let final_x = -0.11 + screen_loc.x * 0.22 / 100 //+ w/2
         let final_y = -0.055 + screen_loc.y * 0.11 / 100 //- h/2
 
-        // console.log('final:',final_x,final_y)
+        // // console.log('final:',final_x,final_y)
 
 
         
@@ -304,7 +304,7 @@ class ThirdPersonCamera {
         let rot = ang + this.angle_offset
         let z_comp = Math.cos(rot);
         let x_comp = Math.sin(rot);
-        // // console.log(x_comp,z_comp)
+        // // // console.log(x_comp,z_comp)
 
         if(DISC.state.playerID == this.controller.id){
             temp_x = obj.position.x - dist_from_player*x_comp;
@@ -325,7 +325,7 @@ class ThirdPersonCamera {
 
         
 
-        // console.log(this.camera.position.x, this.speed_bar.position.x)
+        // // console.log(this.camera.position.x, this.speed_bar.position.x)
 
 
 
@@ -339,7 +339,7 @@ class ThirdPersonCamera {
 
             let tl = THROW.AOI
             if(tl != this.AOI.geometry.parameters.thetaLength){
-                // console.log('changing to',tl)
+                // // console.log('changing to',tl)
                 this.camera.remove(this.AOI)
                 this.AOI = this.createHUD({type: 'circle', radius: 20, angle: tl}, new THREE.MeshBasicMaterial({color:'blue'}),{x:0,y:4})
                 this.HUD_objects.aoi = this.AOI;
@@ -408,7 +408,7 @@ class CharacterController {
         this.character = 'shannon';
 
         loadModel(this.character, model => {
-            console.log('character controller constructor')
+            // console.log('character controller constructor')
             this.entity = model;
 
 
@@ -430,7 +430,7 @@ class CharacterController {
             this.mixer = new THREE.AnimationMixer(this.entity.children[characters[this.character].bone])
             scene.add(this.entity)
             this.animations = {}
-            console.log('Controllable Player?',control)
+            // console.log('Controllable Player?',control)
             if(control){
                 this.camera = new ThirdPersonCamera(this);
                 this.input = new CharacterControllerInput(this)
@@ -447,7 +447,7 @@ class CharacterController {
         
             for(let s in states){
                 loadAnimation(characters[this.character].anim_path + states[s][0], (path,anim) => {
-                    // console.log('adding animation:',path)
+                    // // console.log('adding animation:',path)
                     this.addAnimation(path,anim)
                 })
             }
@@ -456,16 +456,16 @@ class CharacterController {
             
                 for(let trans of transitions){
                     let [prev, req, next] = trans;
-                    // console.log('Prev:',prev,'Req:',req,'Next:',next)
+                    // // console.log('Prev:',prev,'Req:',req,'Next:',next)
                     this.addTransition(prev, req, next)
                 }
             }
         
         
-            console.log('Bones:')
-            console.log(this.bones)
+            // console.log('Bones:')
+            // console.log(this.bones)
 
-            console.log('this:',this)
+            // console.log('this:',this)
 
         })
 
@@ -477,19 +477,19 @@ class CharacterController {
         // temp.timeScale = 60
         path = path.split('/')[1]
         this.animations[path] = temp
-        // // console.log(this.animations['idle'])
-        console.log(path,this.animations[path])
-        // console.log('CharacterController::addAnimation:',path);
+        // // // console.log(this.animations['idle'])
+        // console.log(path,this.animations[path])
+        // // console.log('CharacterController::addAnimation:',path);
         if(path == intro) {this.animations[path].play();}
         if(path == 'vertical') this.animations[path].setLoop(THREE.LoopOnce)
 
 
-        // console.log(this)
+        // // console.log(this)
     }
 
 
     addTransition(prev, req, next, options={}){
-        // console.log('CharacterController::addTransition: calling inner functions');
+        // // console.log('CharacterController::addTransition: calling inner functions');
         this.FSM.addTransition(prev, req, next, options)
     }
 
@@ -525,7 +525,7 @@ class CharacterController {
         }
 
         if(inp[keys.c] == true){
-            console.log(DISC)
+            // console.log(DISC)
         }
         if(inp[keys.c] == true && DISC.state.location != 'hand'){
             let left_hand = new Vector3();
@@ -585,9 +585,9 @@ class CharacterController {
 
             socket.emit('playerState',{id:PLAYER_ID, state:next});
 
-            console.log(prev,'to',next)
+            // console.log(prev,'to',next)
 
-            // console.log('CharacterController::processInput: Transitioning from',prev,'to',next,'! Options:',options);
+            // // console.log('CharacterController::processInput: Transitioning from',prev,'to',next,'! Options:',options);
 
             if(new_state.next == 'jogging_vertical') this.animations[next].time = 0.35;
             else this.animations[next].time = 0.0;
@@ -619,7 +619,7 @@ class CharacterController {
             this.animations[prev].stop()
             
             
-            // console.log('Playing animation:',next)
+            // // console.log('Playing animation:',next)
 
             
 
@@ -657,7 +657,7 @@ class CharacterController {
 
         if(new_vel != this.velocity){
             this.velocity = new_vel;
-            // console.log('new velocity:',new_vel)
+            // // console.log('new velocity:',new_vel)
             socket.emit('playerVelocity',{id:PLAYER_ID, velocity:new_vel})
         }
 
@@ -699,14 +699,14 @@ class CharacterController {
 
     updateStateRemote(new_state){
 
-        console.log('changing state remotely ',this.state,'to',new_state)
+        // console.log('changing state remotely ',this.state,'to',new_state)
         let prev = this.current_anim;
         let next = new_state
         // let options = new_state.options;
 
-        // console.log(prev,'to',next)
+        // // console.log(prev,'to',next)
 
-        // console.log('CharacterController::processInput: Transitioning from',prev,'to',next,'! Options:',options);
+        // // console.log('CharacterController::processInput: Transitioning from',prev,'to',next,'! Options:',options);
 
         this.animations[next].time = 0.0;
         this.animations[next].enabled = true;
@@ -718,7 +718,7 @@ class CharacterController {
         // this.animations[next].fadeIn(0.5)
         this.animations[next].play()
         this.animations[prev].stop()
-        // console.log('Playing animation:',next)
+        // // console.log('Playing animation:',next)
 
         
 
@@ -753,7 +753,7 @@ class CharacterControllerInput {
 class FiniteStateMachine {
     constructor(controller, states){
         this.controller = controller
-        console.log('Init FSM: Controller =>',this.controller)
+        // console.log('Init FSM: Controller =>',this.controller)
         this.currentState = 'idle'
 
         // this.special_rules = {'vertical': [{function_check: x => (x.time > 2.2), state: 'idle'}]}
@@ -763,7 +763,7 @@ class FiniteStateMachine {
             this.states[s] = new FSMState(s,states[s])
         }
 
-        console.log('FSM: States =>',this.states)
+        // console.log('FSM: States =>',this.states)
     }
 
     satisfiesRequirements(inp, inp_key) {
@@ -785,7 +785,7 @@ class FiniteStateMachine {
         // req: {true:['w','shift', ...], false:[' ','d', ...]}
         let true_set = new Set(req.true)
         let false_set = new Set(req.false)
-        // // console.log('FSM::checkCollision: inp_key =',inp_key)
+        // // // console.log('FSM::checkCollision: inp_key =',inp_key)
         inp_key = JSON.parse(inp_key);
         for(let t of inp_key.true){
             if(true_set.has(t) == false) return false;
@@ -799,16 +799,16 @@ class FiniteStateMachine {
     }
 
     addTransition(prev, req, next, options){
-        // // console.log('FSM::addTransition: entered function. Params:',prev,req,next,options);
+        // // // console.log('FSM::addTransition: entered function. Params:',prev,req,next,options);
         for(let inp_key in this.states[prev].transitions){
-            // // console.log('Checking collision with',inp_key)
+            // // // console.log('Checking collision with',inp_key)
             if(this.checkCollision(req, inp_key))
             {
-                // console.log('This transition:',prev,req,next,'is comparable to another transition')
+                // // console.log('This transition:',prev,req,next,'is comparable to another transition')
                 return null;
             }
         }
-        // console.log('FSM::addTransition: adding transition',req,next);
+        // // console.log('FSM::addTransition: adding transition',req,next);
         this.states[prev].addTransition(req, next, options);
     }
 
@@ -820,13 +820,13 @@ class FiniteStateMachine {
         let time_to_throw = false;
 
         let inp_key = null;
-        // console.log('current state:',this.currentState)
+        // // console.log('current state:',this.currentState)
         let timeout = this.states[this.currentState].timeout;
         if(timeout != null) {
             let anim = this.states[this.currentState].animation
 
             if (this.controller.animations[anim].time > timeout[0]){
-                console.log('Timeout transition! ==>', timeout[1])
+                // console.log('Timeout transition! ==>', timeout[1])
                 if(timeout[1] == 'throw'){
                     if(DISC.state.playerID == PLAYER_ID)
                         time_to_throw = true;
@@ -847,13 +847,13 @@ class FiniteStateMachine {
 
         if(time_to_throw == true) return 'throw';
 
-        // // console.log('FSM::updateState: current state\'s transitions:',this.states[this.currentState])
+        // // // console.log('FSM::updateState: current state\'s transitions:',this.states[this.currentState])
         for(let k in this.states[this.currentState].transitions){
-            // // console.log('transition key:',k)
+            // // // console.log('transition key:',k)
             if(this.satisfiesRequirements(inp, k)){
-                console.log('FSM::updateState: found inp_key match with',k)//this.states[this.currentState].transitions[k]);
+                // console.log('FSM::updateState: found inp_key match with',k)//this.states[this.currentState].transitions[k]);
                 inp_key = k;
-                // console.log('Updating inp_key to',inp_key)
+                // // console.log('Updating inp_key to',inp_key)
                 break
             }
         }
@@ -861,7 +861,7 @@ class FiniteStateMachine {
 
         if(inp_key == null) return null;
 
-        // // console.log('reached here')
+        // // // console.log('reached here')
 
         let next_state = this.states[this.currentState].transitions[inp_key]
         let prev_state = this.currentState
@@ -873,7 +873,7 @@ class FiniteStateMachine {
             options: next_state.options
         }
 
-        // // console.log('FSM::updateState: Returning:',res)
+        // // // console.log('FSM::updateState: Returning:',res)
 
         return res;
 
@@ -913,7 +913,7 @@ class FSMState {
             state: next,
             options: opt
         };
-        // console.log('FSMState::addTransition: added transition:', this.transitions[inp_key]);
+        // // console.log('FSMState::addTransition: added transition:', this.transitions[inp_key]);
 
     }
 
@@ -1362,7 +1362,7 @@ class DiscEntity {
             d2 = f2 * sin(AOI);
 
 
-            // console.log('AOM:',AOM)
+            // // console.log('AOM:',AOM)
 
             let lift = l1 + l2;
             let drag = d1 + d2;
@@ -1373,8 +1373,8 @@ class DiscEntity {
             // }
 
 
-            // console.log('Lift: ',lift - disc_flight_params.g, 'Drag: ',drag)
-            // console.log('AOM:',AOM*180/Math.PI,'F speed:',Math.sqrt(v.x*v.x+v.z+v.z), 'U speed:', v.y, 'Lift:',lift,'Drag:',drag,'Upwards F:',lift-9.8)
+            // // console.log('Lift: ',lift - disc_flight_params.g, 'Drag: ',drag)
+            // // console.log('AOM:',AOM*180/Math.PI,'F speed:',Math.sqrt(v.x*v.x+v.z+v.z), 'U speed:', v.y, 'Lift:',lift,'Drag:',drag,'Upwards F:',lift-9.8)
 
             let P = new Vector3(); // new position
             let V = new Vector3();
@@ -1399,7 +1399,7 @@ class DiscEntity {
             V.z = v.z - ( (drag * t) * this.throw_z ) //+ ( this.throw_side * side_z_comp);
 
 
-            // console.log('Upward Force:',lift - disc_flight_params.g);
+            // // console.log('Upward Force:',lift - disc_flight_params.g);
             
             // update velocity
 
@@ -1421,9 +1421,9 @@ class DiscEntity {
             }
 
             if(V.x == 0 && V.z == 0){
-                // console.log('Became Zero!')
+                // // console.log('Became Zero!')
             }
-            // console.log(V.y)
+            // // console.log(V.y)
             this.velocity = V
             // this.velocity.y = V.y
 
@@ -1436,8 +1436,8 @@ class DiscEntity {
             P.y = (p.y + (V.y * t));
             P.z = (p.z + (V.z * t) + this.throw_side * t * side_z_comp);
 
-            // console.log('old position:',p.x,p.y,p.z)
-            // console.log('new position:',P.x,P.y,P.z)
+            // // console.log('old position:',p.x,p.y,p.z)
+            // // console.log('new position:',P.x,P.y,P.z)
 
             this.mesh.position.x = P.x
             this.mesh.position.y = P.y
@@ -1449,7 +1449,7 @@ class DiscEntity {
             else{
                 look_vector.set(-this.throw_x, 1/Math.tan(AOI), -this.throw_z);
             } 
-            // console.log('looking at:',look_vector.x,look_vector.y,look_vector.z);
+            // // console.log('looking at:',look_vector.x,look_vector.y,look_vector.z);
             look_vector.x += this.mesh.position.x
             look_vector.y += this.mesh.position.y
             look_vector.z += this.mesh.position.z
@@ -1473,7 +1473,7 @@ class DiscEntity {
                 this.state.playerID = null;
                 socket.emit('discState',{location:'ground'})
                 // this.mesh.position.set(0,5,0)
-                // console.log('ended with vy:',this.velocity.y)
+                // // console.log('ended with vy:',this.velocity.y)
                 this.mesh.position.y = 0.1;
                 this.mesh.rotation.set(-Math.PI/2,0,0);
                 this.velocity.set(0,0,0);
@@ -1494,7 +1494,7 @@ class DiscEntity {
     }
 
     throw(){
-        // console.log('throwing')
+        // // console.log('throwing')
 
         
 
@@ -1532,7 +1532,7 @@ class DiscEntity {
             disc_flight_params.throw_direction_z = this.throw_z;
         }
 
-        // console.log('throwing to:',this.throw_x,this.throw_z)
+        // // console.log('throwing to:',this.throw_x,this.throw_z)
 
 
         this.throw_side = 0;
@@ -1543,16 +1543,16 @@ class DiscEntity {
     getArc(){
         let ang = -PLAYER.entity.rotation.y + Math.PI/2;
         
-        // console.log('Init angle:',ang)
+        // // console.log('Init angle:',ang)
 
         let res = {}
         let i=0;
         arcPoints = [];
         for(let t = ang - 5*Math.PI/12; t <= ang + 5*Math.PI/12; t += Math.PI/48){
-            // console.log('computing for angle:',(t-ang)*180/Math.PI)
+            // // console.log('computing for angle:',(t-ang)*180/Math.PI)
             let v = new Vector2(cos(t),sin(t)).multiplyScalar(10);
             let v3 = new Vector3(v.x,0,v.y).add(PLAYERS[this.state.playerID].center_bone.getWorldPosition(new Vector3()));
-            // console.log(v3)
+            // // console.log(v3)
             res[t] = screenXY(v3,PLAYER.camera.camera)
 
             arcPoints[i] = v3;
@@ -1580,8 +1580,8 @@ document.addEventListener('keydown', e => {
     }
     else if(e.key == 'p'){
         let discscreen = screenXY(DISC.mesh.position, PLAYER.camera.camera)
-        console.log('Mouse:',screenMouse.x,screenMouse.y)
-        console.log('Disc:',discscreen.x,discscreen.y)
+        // console.log('Mouse:',screenMouse.x,screenMouse.y)
+        // console.log('Disc:',discscreen.x,discscreen.y)
     }
     // else if(e.key == 'q'){
     //     THROW.AOT += 0.1
@@ -1590,8 +1590,8 @@ document.addEventListener('keydown', e => {
     //     THROW.AOT -= 0.1
     // }
     else if(e.key=='0'){
-        console.log('My player:',PLAYER_ID)
-        console.log(PLAYERS)
+        // console.log('My player:',PLAYER_ID)
+        // console.log(PLAYERS)
     }
 })
 
@@ -1600,15 +1600,15 @@ function computeArc(){
 
     let init_angle = arc.init;
     let res = arc.res;
-    // console.log(res);
+    // // console.log(res);
     let tar = screenMouse.x;
-    // console.log('Target:',tar)
+    // // console.log('Target:',tar)
     let ans;
     let min = Infinity;
     let ind;
     let i=0;
     for(let ang in res){
-        // console.log(ang,res[ang])
+        // // console.log(ang,res[ang])
         if(min > Math.abs(res[ang].x - tar)){
             min = Math.abs(res[ang].x - tar)
             ans = ang
@@ -1622,7 +1622,7 @@ function computeArc(){
 
     arcPoints[ind].y += y_change;
 
-    // console.log('Index:',ind,arcPoints.map(x=>x.y))
+    // // console.log('Index:',ind,arcPoints.map(x=>x.y))
     // arcPoints = [DISC.mesh.position, arcPoints[ind]];
     scene.remove(arcLine)
     arcGeometry = new THREE.BufferGeometry().setFromPoints(arcPoints)
@@ -1635,7 +1635,7 @@ function computeArc(){
         init: init_angle
     }
 
-    // console.log('Angle:',ans * 180 / Math.PI)
+    // // console.log('Angle:',ans * 180 / Math.PI)
 }
 
 document.addEventListener('keyup', e => {
@@ -1659,7 +1659,7 @@ window.addEventListener('resize', () =>
     sizes.width = window.innerWidth
     sizes.height = window.innerHeight
 
-    console.log('new width:',sizes.width)
+    // console.log('new width:',sizes.width)
 
     // Update camera
     camera.aspect = sizes.width / sizes.height
@@ -1692,7 +1692,7 @@ const screenMouse = new THREE.Vector2();
 
 function onMouseMove( event ) {
 
-    // console.log('yep')
+    // // console.log('yep')
 
 	// calculate mouse position in normalized device coordinates
 	// (-1 to +1) for both components
@@ -1746,7 +1746,7 @@ const tick = () =>
 	
     // else onfield = false
 
-    // console.log(delta)
+    // // console.log(delta)
     // if (mixer) mixer.update(0.0005);
 
     // Render
@@ -1782,7 +1782,7 @@ const tick = () =>
         }
 
 
-        if(PLAYER.entity.position.y != 0) console.log('player posY:',PLAYER.entity.position.y)
+        // if(PLAYER.entity.position.y != 0) console.log('player posY:',PLAYER.entity.position.y)
 
         
     }
@@ -1855,7 +1855,7 @@ function screenXY(obj,camera){
 socket.on('init', data => {
     // data: {players, disc, id}
 
-    console.log('SOCKET::init',data)
+    // console.log('SOCKET::init',data)
 
     PLAYER_ID = data.id;
 
@@ -1876,21 +1876,21 @@ socket.on('init', data => {
 
 socket.on('newPlayer', data => {
     // data: {id}
-    console.log('SOCKET::new',data)
+    // console.log('SOCKET::new',data)
     PLAYERS[data.id] = new CharacterController(parseInt(data.id))
 })
 
 socket.on('playerVelocity', data => {
     // data: {id,velocity}
-    // console.log('SOCKET::speed',data)
-    // console.log(PLAYERS[data.id].id)
+    // // console.log('SOCKET::speed',data)
+    // // console.log(PLAYERS[data.id].id)
     PLAYERS[parseInt(data.id)].velocity = data.velocity;
 })
 
 socket.on('playerRotation', data => {
     // data: {id,rotaiton}
-    // console.log('SOCKET::rotate',data)
-    // console.log(PLAYERS[data.id].id)
+    // // console.log('SOCKET::rotate',data)
+    // // console.log(PLAYERS[data.id].id)
     PLAYERS[parseInt(data.id)].entity.rotation.y = data.rotation;
 })
 
@@ -1903,7 +1903,7 @@ socket.on('playerState', data => {
 socket.on('playerPosition', data => {
     // data: {id,pos}
 
-    console.log('Socket::player position changed:',data)
+    // // console.log('Socket::player position changed:',data)
 
     setVector(PLAYERS[parseInt(data.id)].entity.position, data.position)
 })
@@ -1967,7 +1967,7 @@ document.addEventListener('keydown',e=>{
 })
 
 window.addEventListener('wheel', e => {
-    // console.log(e)
+    // // console.log(e)
     if(DISC.state.playerID == PLAYER_ID){
         if(e.deltaY < 0)
             // THROW.AOT = Math.max(-Math.PI/3,THROW.AOT - 0.2)
