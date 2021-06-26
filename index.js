@@ -75,7 +75,7 @@ io.on('connection', (client) => {
     })
 
     client.on('playerState',function(data){
-        // console.log('changing state of:',data)
+        console.log('changing state of:',data)
         players[data.id].state = data.state;
         client.broadcast.emit('playerState',{id:data.id,state:data.state})
     })
@@ -97,13 +97,28 @@ io.on('connection', (client) => {
 
     client.on('disconnect',function(data){
         console.log(ids[client.id],'has disconnected!')
+        if(disc.state.location == 'hand' && disc.state.playerID == ids[client.id]){
+            disc.state.location = 'air'
+            disc.state.playerID = null
+        }
+        // console.log(players)
         io.emit('removePlayer',{id:ids[client.id]})
 
+        delete players[ids[client.id]];
         delete ids[client.id];
+
+        console.log(players)
+    })
+
+
+
+
+    client.on('ping',function(data){
+        client.emit('ping',data);
     })
 
 
 
 })
 
-server.listen(9000, ()=>{console.log('Listening on port 8000...')})
+server.listen(8000, ()=>{console.log('Listening on port 8000...')})

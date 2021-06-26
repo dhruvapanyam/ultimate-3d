@@ -1,6 +1,6 @@
 import io from 'socket.io-client';
 console.log(process.env.NODE_ENV)
-const socket = process.env.NODE_ENV === 'production' ? io() : io('http://localhost:9000');
+const socket = process.env.NODE_ENV === 'production' ? io() : io('http://localhost:8000/');
 
 // ------------------------------ THREE.JS -------------------------------
 
@@ -67,11 +67,11 @@ directionalLight.shadow.camera.left = 500;
 directionalLight.shadow.camera.bottom = -500;
 directionalLight.shadow.camera.right = -500;
 
-directionalLight.shadow.mapSize.set(4096,4096)
+directionalLight.shadow.mapSize.set(2048,2048)
 
 scene.add(directionalLight)
 
-const hemisphereLight = new THREE.HemisphereLight( 0xffffff, 0xffffff, 0.8 );
+const hemisphereLight = new THREE.HemisphereLight( 0xffffff, 0xffffff, 1 );
 scene.add( hemisphereLight );
 
 /**
@@ -100,11 +100,11 @@ renderer.shadowMap.enabled = true;
 renderer.setClearColor('#79e8e6',0.7)
 
 
-var controls = new OrbitControls(camera, renderer.domElement)
-controls.target.set(0,0,0)
-controls.enableDamping = true
-controls.maxPolarAngle = Math.PI / 2 - 0.1
-controls.zoomSpeed = 0.5
+// var controls = new OrbitControls(camera, renderer.domElement)
+// controls.target.set(0,0,0)
+// controls.enableDamping = true
+// controls.maxPolarAngle = Math.PI / 2 - 0.1
+// controls.zoomSpeed = 0.5
 
 // Objects
 // --------------------------------------------------------------------------------------------------------
@@ -142,6 +142,7 @@ function loadModel(model_path, callback){
     fbxLoader.load(
         './models/'+model_path+'.fbx',
         function(obj){
+            console.log(model_path,obj)
             obj.scale.set(0.05,0.05,0.05)
             obj.traverse(node=>{if(node.isMesh){node.castShadow=true;node.receiveShadow=true;}})
             callback(obj)
@@ -153,8 +154,8 @@ function loadAnimation(anim_path, callback){
     fbxLoader.load(
         './models/animations/'+anim_path+'.fbx',
         function(obj){
-            // console.log('loadAnimation:',anim_path,obj)
-            if(anim_path == 'untitled')
+            console.log('loadAnimation:',anim_path,obj)
+            if(anim_path == 'mannequin/throw_back')
                 callback(anim_path, obj.animations[1])
             else
                 callback(anim_path, obj.animations[0])
@@ -209,7 +210,7 @@ class ThirdPersonCamera {
        
         console.log(this.minimap)
 
-        this.HUD_objects = {speed:this.speed_bar, speedamt:this.speed_amt, aot:this.AOT, aoi:this.AOI, mini:this.minimap, mini1:this.minimap_inner[0],mini2:this.minimap_inner[1],mini3:this.minimap_inner[2]};
+        this.HUD_objects = {speed:this.speed_bar, speedamt:this.speed_amt, aot:this.AOT, aoi:this.AOI}//, mini:this.minimap, mini1:this.minimap_inner[0],mini2:this.minimap_inner[1],mini3:this.minimap_inner[2]};
         for(let obj in this.HUD_objects){
             this.camera.remove(this.HUD_objects[obj])
         }
@@ -281,56 +282,79 @@ class ThirdPersonCamera {
     update(obj){
         let ang = obj.rotation.y;
 
+        let dist_from_player = 30;
+
+        let temp_x,temp_y,temp_z;
+
         if(DISC.state.playerID != this.controller.id){
             // not holding disc, can move around.
-            if(gazeMouse.x != prevGazeMouse.x){
-                this.angle_offset -= 1 * (gazeMouse.x - prevGazeMouse.x)
-                prevGazeMouse.x = gazeMouse.x;
-                // flag = 1
-            }
+            // if(gazeMouse.x != prevGazeMouse.x){
+            //     this.angle_offset -= 1 * (gazeMouse.x - prevGazeMouse.x)
+            //     prevGazeMouse.x = gazeMouse.x;
+            //     // flag = 1
+            // }
+            this.angle_offset = -gazeMouse.x * 3;
+
+            temp_y = 15 + ((gazeMouse.y - 0.4) * 6)
+        }
+        else{
+            this.camera.position.y = 15;
+            dist_from_player = 20;
         }
         let rot = ang + this.angle_offset
         let z_comp = Math.cos(rot);
         let x_comp = Math.sin(rot);
         // // console.log(x_comp,z_comp)
 
-        let bone = 'mixamorig1Hips'
-        // this.camera.position.x = bones[bone].getWorldPosition(new Vector3).x - 20*x_comp;
-        this.camera.position.x = obj.position.x - 20*x_comp;
-        // this.camera.position.z = bones[bone].getWorldPosition(new Vector3).z - 20*z_comp;
-        this.camera.position.z = obj.position.z - 20*z_comp;
+        if(DISC.state.playerID == this.controller.id){
+            temp_x = obj.position.x - dist_from_player*x_comp;
+            temp_z = obj.position.z - dist_from_player*z_comp;
 
-        this.camera.lookAt(obj.position.x + 20*x_comp, 0, obj.position.z + 20*z_comp)
+            // this.camera.lookAt(obj.position.x + 20*x_comp, 15 - this.camera.position.y, obj.position.z + 20*z_comp);
+        }
+        else{
+            let bone = new Vector3();
+            this.controller.center_bone.getWorldPosition(bone);
+            temp_x = bone.x - dist_from_player*x_comp;
+            temp_z = bone.z - dist_from_player*z_comp;
+    
+            // this.camera.lookAt(bone.x + 20*x_comp, 15 - this.camera.position.y, bone.z + 20*z_comp)
+        }
+
+        this.camera.position.lerp(new Vector3(temp_x,temp_y,temp_z), 0.1);
+
+        
 
         // console.log(this.camera.position.x, this.speed_bar.position.x)
 
 
 
 
-        if(DISC.state.playerID != this.controller.id) return;
+        if(DISC.state.playerID == this.controller.id){
 
-        this.speed_amt.scale.x = THROW.forward_speed / 30;
+            this.speed_amt.scale.x = THROW.forward_speed / 30;
 
-        this.placeHUD(this.speed_amt, {x:0.25,y:1.75})
-        
+            this.placeHUD(this.speed_amt, {x:0.25,y:1.75})
+            
 
-        let tl = THROW.AOI
-        if(tl != this.AOI.geometry.parameters.thetaLength){
-            // console.log('changing to',tl)
-            this.camera.remove(this.AOI)
-            this.AOI = this.createHUD({type: 'circle', radius: 20, angle: tl}, new THREE.MeshBasicMaterial({color:'blue'}),{x:0,y:4})
-            this.HUD_objects.aoi = this.AOI;
-            if(DISC.state.playerID != this.controller.id) this.camera.remove(this.AOI);
+            let tl = THROW.AOI
+            if(tl != this.AOI.geometry.parameters.thetaLength){
+                // console.log('changing to',tl)
+                this.camera.remove(this.AOI)
+                this.AOI = this.createHUD({type: 'circle', radius: 20, angle: tl}, new THREE.MeshBasicMaterial({color:'blue'}),{x:0,y:4})
+                this.HUD_objects.aoi = this.AOI;
+                if(DISC.state.playerID != this.controller.id) this.camera.remove(this.AOI);
+            }
+
+            // if(this.controller.input.keys[keys.q] == true){
+            //     THROW.AOT = Math.max(-Math.PI/3,THROW.AOT-0.01)
+            // }
+            // else if(this.controller.input.keys[keys.r] == true){
+            //     THROW.AOT = Math.min(Math.PI/3,THROW.AOT+0.01)
+            // }
+
+            this.AOT.rotation.z = -THROW.AOT;
         }
-
-        if(this.controller.input.keys[keys.q] == true){
-            THROW.AOT = Math.max(-Math.PI/3,THROW.AOT-0.01)
-        }
-        else if(this.controller.input.keys[keys.r] == true){
-            THROW.AOT = Math.min(Math.PI/3,THROW.AOT+0.01)
-        }
-
-        this.AOT.rotation.z = -THROW.AOT;
 
         // this.minimap_players[this.controller.id].position.x -= 0.001
 
@@ -354,15 +378,56 @@ class ThirdPersonCamera {
 }
 
 
+const characters = {
+    'mannequin': {
+        bone: 1,
+        anim_path: 'mannequin/',
+        slice: 10
+    },
+
+    'sophie': {
+        bone: 6,
+        anim_path: 'mannequin/',
+        slice: 9
+    },
+
+    'shannon': {
+        bone: 0,
+        anim_path: 'mannequin/',
+        slice: 10
+    }
+}
+
+
 const intro = 'idle'
 class CharacterController {
     constructor(id, control=false, position=new Vector3(), rotation=0, velocity=0, states=player_states, transitions=player_transitions ){
 
         this.id = id;
 
-        loadModel('mannequin', model => {
+        this.character = 'shannon';
+
+        loadModel(this.character, model => {
+            console.log('character controller constructor')
             this.entity = model;
-            this.mixer = new THREE.AnimationMixer(this.entity.children[0])
+
+
+
+            this.bones = {};
+            let cur = [this.entity.children[characters[this.character].bone]];
+            while(cur.length > 0){
+                let bone = cur[0]
+                bone.name = 'mixamorig1' + bone.name.slice(characters[this.character].slice);
+                this.bones[bone.name] = bone;
+                cur = cur.slice(1);
+                for(let c of bone.children) cur.push(c)
+            }
+
+            // this.center_bone = this.bones[characters[this.character].rig];
+            this.center_bone = this.bones['mixamorig1Hips'];
+
+            // this.mixer = new THREE.AnimationMixer(this.entity.children[characters[this.character].bone])
+            this.mixer = new THREE.AnimationMixer(this.entity.children[characters[this.character].bone])
             scene.add(this.entity)
             this.animations = {}
             console.log('Controllable Player?',control)
@@ -381,7 +446,7 @@ class CharacterController {
             this.entity.rotation.y = rotation
         
             for(let s in states){
-                loadAnimation(states[s][0], (path,anim) => {
+                loadAnimation(characters[this.character].anim_path + states[s][0], (path,anim) => {
                     // console.log('adding animation:',path)
                     this.addAnimation(path,anim)
                 })
@@ -396,17 +461,9 @@ class CharacterController {
                 }
             }
         
-            this.bones = {};
-            let cur = [this.entity.children[1]];
-            while(cur.length > 0){
-                let bone = cur[0]
-                this.bones[bone.name] = bone;
-                cur = cur.slice(1);
-                for(let c of bone.children) cur.push(c)
-            }
         
-            // console.log('Bones:')
-            // console.log(this.bones)
+            console.log('Bones:')
+            console.log(this.bones)
 
             console.log('this:',this)
 
@@ -418,9 +475,10 @@ class CharacterController {
     addAnimation(path,anim){
         let temp = this.mixer.clipAction(anim)
         // temp.timeScale = 60
+        path = path.split('/')[1]
         this.animations[path] = temp
         // // console.log(this.animations['idle'])
-        // console.log(path,this.animations[path])
+        console.log(path,this.animations[path])
         // console.log('CharacterController::addAnimation:',path);
         if(path == intro) {this.animations[path].play();}
         if(path == 'vertical') this.animations[path].setLoop(THREE.LoopOnce)
@@ -446,13 +504,17 @@ class CharacterController {
 
         else{
             if(THROW.forward_speed > 0.5 && DISC.state.location == 'hand' && DISC.state.playerID == this.id){
-                DISC.prepareThrow();
-                socket.emit('throw',THROW);
+                // DISC.prepareThrow();
+                // socket.emit('throw',THROW);
 
-                for(let obj in this.camera.HUD_objects){
-                    this.camera.camera.remove(this.camera.HUD_objects[obj]);
-                }
-                DISC.throw();
+                // for(let obj in this.camera.HUD_objects){
+                //     this.camera.camera.remove(this.camera.HUD_objects[obj]);
+                // }
+                // DISC.throw();
+
+                this.input.keys['catch_disc'] = false;
+                this.input.keys['throw_disc'] = true;
+                this.input.keys['threw_disc'] = false;
             }
             else
                 THROW.forward_speed = 0.5;
@@ -462,11 +524,19 @@ class CharacterController {
             THROW.AOI = (THROW.AOI + Math.PI/150) % (Math.PI/3);
         }
 
-
+        if(inp[keys.c] == true){
+            console.log(DISC)
+        }
         if(inp[keys.c] == true && DISC.state.location != 'hand'){
-            let mesh_center = this.entity.position.clone();
-            mesh_center.y += 4;
-            if(mesh_center.distanceTo(DISC.mesh.position) < 8){
+            let left_hand = new Vector3();
+            let right_hand = new Vector3();
+
+            this.bones['mixamorig1RightHand'].getWorldPosition(right_hand)
+            this.bones['mixamorig1LeftHand'].getWorldPosition(left_hand)
+
+            // mesh_center.y += 4;
+            let catching_dist = 12;
+            if(left_hand.distanceTo(DISC.mesh.position) < catching_dist || right_hand.distanceTo(DISC.mesh.position) < catching_dist){
 
                 socket.emit('discState',{location:'hand',playerID:this.id});
 
@@ -474,7 +544,11 @@ class CharacterController {
                     this.camera.camera.add(this.camera.HUD_objects[obj]);
                 }
 
-                PLAYER.camera.angle_offset = 0;
+                this.input.keys['catch_disc'] = true;
+                this.input.keys['throw_disc'] = false;
+                this.input.keys['threw_disc'] = false;
+
+                this.camera.angle_offset = 0;
                 DISC.state.location = 'hand'
                 DISC.state.playerID = this.id;
             }
@@ -482,9 +556,27 @@ class CharacterController {
 
         let new_state = this.FSM.updateState(inp);
 
-        if(new_state == null) return;
+        if(new_state == 'throw'){
+            DISC.prepareThrow();
+            socket.emit('throw',THROW)
+            DISC.throw();
+
+            gazeMouse.x = 0
+            prevGazeMouse.x = 0;
+
+            for(let obj in PLAYER.camera.HUD_objects){
+                PLAYER.camera.camera.remove(PLAYER.camera.HUD_objects[obj]);
+            }
+
+            PLAYER.input.keys['threw_disc'] = true;
+            PLAYER.input.keys['throw_disc'] = false;
+            PLAYER.input.keys['catch_disc'] = false;
+        }
+        else if(new_state == null) return;
         else {
 
+            // if(new_state.)
+            
             // need to transition to new_state  
 
             let prev = this.FSM.states[new_state.prev].animation;
@@ -493,25 +585,45 @@ class CharacterController {
 
             socket.emit('playerState',{id:PLAYER_ID, state:next});
 
-            // console.log(prev,'to',next)
+            console.log(prev,'to',next)
 
             // console.log('CharacterController::processInput: Transitioning from',prev,'to',next,'! Options:',options);
 
-            this.animations[next].time = 0.0;
+            if(new_state.next == 'jogging_vertical') this.animations[next].time = 0.35;
+            else this.animations[next].time = 0.0;
             this.animations[next].enabled = true;
             // this.animations[prev].setEffectiveWeight(1-options.effectiveWeight);
+            this.animations[next].reset();
             this.animations[next].setEffectiveWeight(1.0);
+            this.animations[next].setEffectiveTimeScale(1.0);
 
             // if(0 && options.crossfade == true) this.animations[next].crossFadeFrom(this.animations[prev], options.crossFadeDuration, options.crossFadeWarp);
             // this.animations[prev].fadeOut(0.5)
             // this.animations[next].fadeIn(0.5)
+
+            if(prev == 'dive_right' || prev == 'dive_left'){
+                this.entity.position.x = this.center_bone.getWorldPosition(new Vector3()).x
+                this.entity.position.z = this.center_bone.getWorldPosition(new Vector3()).z
+            }
+
+
+            // this.animations[next].play()
+            // this.animations[prev].fadeOut(0.1)
+            // this.animations[next].fadeIn(0.2)
+            // this.animations[prev].stop()
+
+
+            // this.animations[next].crossFadeFrom(this.animations[prev], 0.2, true)
+
             this.animations[next].play()
             this.animations[prev].stop()
+            
+            
             // console.log('Playing animation:',next)
 
             
 
-            this.state = next;
+            this.state = new_state.next;
 
         }
 
@@ -520,23 +632,32 @@ class CharacterController {
     }
 
     updateVelocity(){
-        let new_vel = 0;
-        if(this.state == 'idle'){
-            new_vel = Math.max(0, this.velocity - 0.01)
-        }
-        else if(this.state == 'jogging'){
-            new_vel = Math.min(this.velocity+0.005, 0.3);
-        }
-        else if(this.state == 'running'){
-            new_vel = Math.min(this.velocity+0.01, 0.6);
-        }
+        let new_vel = this.velocity;
 
-        if(DISC.state.playerID == this.id){
-            new_vel = Math.max(0, this.velocity - 0.05);
+        if(velocity_handler[this.state] != undefined){
+            let options = {
+                cur_vel: this.velocity,
+                anim_time: this.animations[this.FSM.states[this.state].animation].time
+            }
+            new_vel = velocity_handler[this.state](options);
         }
+        // if(this.state == 'idle'){
+        //     new_vel = Math.max(0, this.velocity - 0.01)
+        // }
+        // else if(this.state == 'jogging'){
+        //     new_vel = Math.min(this.velocity+0.005, 0.3);
+        // }
+        // else if(this.state == 'running'){
+        //     new_vel = Math.min(this.velocity+0.01, 0.6);
+        // }
+
+        // if(DISC.state.playerID == this.id){
+        //     new_vel = Math.max(0, this.velocity - 0.05);
+        // }
 
         if(new_vel != this.velocity){
             this.velocity = new_vel;
+            // console.log('new velocity:',new_vel)
             socket.emit('playerVelocity',{id:PLAYER_ID, velocity:new_vel})
         }
 
@@ -569,11 +690,6 @@ class CharacterController {
 
         this.updateVelocity()
 
-        // if(this.state == 'forehand'){
-        //     if(this.animations['forehand'].time > 0.8 && this.animations['forehand'].time < 1){
-        //         if(DISC.inHand) DISC.throw()
-        //     }
-        // }
         
     }
 
@@ -614,7 +730,7 @@ class CharacterControllerInput {
     constructor(controller){
         this.controller = controller
         this.keys = {}
-        let inp_keys = ['KeyQ','KeyW','KeyE','KeyR','KeyA','KeyC','KeyS','KeyD','KeyH','KeyJ','Space','ShiftLeft','ShiftRight','ArrowUp','ArrowDown','ArrowLeft','ArrowRight']
+        let inp_keys = ['KeyQ','KeyW','KeyE','KeyR','KeyA','KeyC','KeyS','KeyD','KeyH','KeyJ','Space','ShiftLeft','ShiftRight','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','catch_disc','throw_disc','threw_disc']
         // let inp_keys = ['q','w','e','a','s','d','h','j',' ','shift','arrowup','arrowdown','arrowleft','arrowright']
         for(let inp of inp_keys) this.keys[inp] = false;
 
@@ -640,7 +756,7 @@ class FiniteStateMachine {
         console.log('Init FSM: Controller =>',this.controller)
         this.currentState = 'idle'
 
-        this.special_rules = {'vertical': [{function_check: x => (x.time > 2.2), state: 'idle'}]}
+        // this.special_rules = {'vertical': [{function_check: x => (x.time > 2.2), state: 'idle'}]}
 
         this.states = {}
         for(let s in states){
@@ -701,6 +817,8 @@ class FiniteStateMachine {
         // convert inp to standard form
         // then check if it exists in this.states[this.currentState].transitions
 
+        let time_to_throw = false;
+
         let inp_key = null;
         // console.log('current state:',this.currentState)
         let timeout = this.states[this.currentState].timeout;
@@ -709,23 +827,31 @@ class FiniteStateMachine {
 
             if (this.controller.animations[anim].time > timeout[0]){
                 console.log('Timeout transition! ==>', timeout[1])
-                let res = {
-                    prev: this.currentState,
-                    next: timeout[1],
-                    options: {}
+                if(timeout[1] == 'throw'){
+                    if(DISC.state.playerID == PLAYER_ID)
+                        time_to_throw = true;
                 }
+                else{
+                    let res = {
+                        prev: this.currentState,
+                        next: timeout[1],
+                        options: {}
+                    }
 
-                this.currentState = timeout[1]
+                    this.currentState = timeout[1]
 
-                return res;
+                    return res;
+                }
             }
         }
+
+        if(time_to_throw == true) return 'throw';
 
         // // console.log('FSM::updateState: current state\'s transitions:',this.states[this.currentState])
         for(let k in this.states[this.currentState].transitions){
             // // console.log('transition key:',k)
             if(this.satisfiesRequirements(inp, k)){
-                // console.log('FSM::updateState: found inp_key match with',k)//this.states[this.currentState].transitions[k]);
+                console.log('FSM::updateState: found inp_key match with',k)//this.states[this.currentState].transitions[k]);
                 inp_key = k;
                 // console.log('Updating inp_key to',inp_key)
                 break
@@ -805,21 +931,34 @@ var PLAYER_ID;
 
 var _idle = 'idle'
 var _jogging = 'jogging'
+var _jog_backwards = 'jog_backwards'
+var _shuffle_left = 'shuffle_left'
+var _shuffle_right = 'shuffle_right'
 var _running = 'running'
-var _jump = 'jump_catch'
+var _jump = 'vertical'
+var _dive_left = 'dive_left'
+var _dive_right = 'dive_right'
 var _hold_center = 'hold_disc_center'
-var _hold_fore = 'hold_disc_forehand'
-var _hold_back = 'hold_disc_backhand'
-var _throw_fore = 'forehand'
+var _hold_fore = 'hold_fore'
+var _hold_back = 'hold_backhand'
+var _throw_fore = 'throw_forehand'
+var _throw_back = 'throw_back'
+
+
 
 const keys = {
-    a: 'KeyA',
-    d: 'KeyD',
     q: 'KeyQ',
     w: 'KeyW',
     e: 'KeyE',
     r: 'KeyR',
+    a: 'KeyA',
+    s: 'KeyS',
+    d: 'KeyD',
+    f: 'KeyF',
+    z: 'KeyZ',
+    x: 'KeyX',
     c: 'KeyC',
+    v: 'KeyV',
     space: 'Space',
     Lshift: 'ShiftLeft',
     Rshift: 'ShiftRight',
@@ -830,6 +969,32 @@ const keys = {
     down: 'ArrowDown',
     left: 'ArrowLeft',
     right: 'ArrowRight',
+
+    catch_disc: 'catch_disc',
+    throw_disc: 'throw_disc',
+    threw_disc: 'threw_disc'
+}
+
+
+var key_bindings = {
+    'Jog': keys.w,
+    'Run': keys.Lshift + ' ' + keys.w,
+    'Jog Backwards': keys.s,
+    'Turn Left': keys.a,
+    'Turn Right': keys.d,
+    'Look Left': 'mousemove',
+    'Look Right': 'mousemove',
+    'Catch': keys.c,
+    'Jump Catch': keys.space,
+    'Dive Left': keys.q,
+    'Dive Right': keys.e,
+
+}
+
+var bindings_gui = gui.addFolder('Key Bindings')
+
+for(let k in key_bindings){
+    bindings_gui.add(key_bindings, k)
 }
 
 
@@ -838,49 +1003,147 @@ const player_states = {
 
     'idle': [_idle, null],
     'jogging': [_jogging, null],
+    'jog_backwards': [_jog_backwards, null],
+    'shuffle_left': [_shuffle_left, null],
+    'shuffle_right': [_shuffle_right, null],
     'running': [_running, null],
-    'idle_vertical': [_jump, null],
-    'jogging_vertical': [_jump, [2, 'jogging']],
+    'idle_vertical': [_jump, [1.2, 'idle']],
+    'jogging_vertical': [_jump, [1.2, 'jogging']],
+
+    'dive_left': [_dive_left, [2.3, 'idle']],
+    'dive_right': [_dive_right, [2.3, 'idle']],
     // 'running_vertical': ['jump_catch', [2, 'running']],
     
     'holding_disc_center': [_hold_center, null],
     'holding_disc_forehand': [_hold_fore, null],
     'holding_disc_backhand': [_hold_back, null],
-    'throwing_disc_forehand': [_throw_fore, [1.3, 'idle']],
+    'throwing_disc_forehand': [_throw_fore, [0.5, 'throw']],
+    'throwing_disc_backhand': [_throw_back, [1, 'throw']],
     // 'throwing_disc_backhand': ['throwing_disc_backhand',
 
 }
 
 const player_transitions = [
     ['idle', {true: [keys.w], false: []}, 'jogging'],
+    ['idle', {true: [keys.s], false: []}, 'jog_backwards'],
     ['idle', {true: [keys.w,keys.Lshift], false: []}, 'running'],
-    // ['idle', {true: [keys.space], false: [keys.up,keys.Lshift]}, 'idle_vertical'],
+    ['idle', {true: [keys.q], false: []}, 'dive_left'],
+    ['idle', {true: [keys.e], false: []}, 'dive_right'],
+    ['idle', {true: [keys.space], false: [keys.up,keys.Lshift]}, 'idle_vertical'],
+
+    ['idle', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
+    ['jogging', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
+    ['jog_backwards', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
+    ['running', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
+    ['dive_right', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
+    ['dive_left', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
+    ['idle_vertical', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
+    ['jogging_vertical', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
+
     // ['idle', {true: [keys.space,keys.Lshift], false: [keys.up]}, 'throwing_disc_forehand'],
 
     ['jogging', {true: [keys.w,keys.Lshift], false: []}, 'running'],
     ['jogging', {true: [keys.w,keys.space], false: []}, 'jogging_vertical'],
     ['jogging', {true: [], false: [keys.w]}, 'idle'],
+    ['jogging', {true: [keys.q], false: []}, 'dive_left'],
+    ['jogging', {true: [keys.e], false: []}, 'dive_right'],
+    ['jog_backwards', {true: [], false: [keys.s]}, 'idle'],
 
     ['running', {true: [keys.w], false: [keys.Lshift]}, 'jogging'],
     ['running', {true: [], false: [keys.w]}, 'idle'],
-
-    ['idle_vertical', {true: [], false: [keys.space]}, 'idle'],
+    ['running', {true: [keys.q], false: []}, 'dive_left'],
+    ['running', {true: [keys.e], false: []}, 'dive_right'],
+    
+    // ['idle_vertical', {true: [], false: [keys.space]}, 'idle'],
 
     ['idle', {true: [keys.h], false: [keys.up,keys.Lshift,keys.space]}, 'holding_disc_center'],
-    ['holding_disc_center', {true: [keys.j], false: [keys.q,keys.e]}, 'idle'],
+    // ['holding_disc_center', {true: [keys.j], false: [keys.q,keys.e]}, 'idle'],
     
-    ['holding_disc_center', {true: [keys.e], false: []}, 'holding_disc_forehand'],
-    ['holding_disc_center', {true: [keys.w], false: []}, 'holding_disc_backhand'],
+    ['holding_disc_center', {true: [keys.e], false: [keys.q]}, 'holding_disc_forehand'],
+    ['holding_disc_center', {true: [keys.q], false: [keys.e]}, 'holding_disc_backhand'],
     
-    ['holding_disc_forehand', {true: [], false: [keys.e]}, 'holding_disc_center'],
-    ['holding_disc_backhand', {true: [], false: [keys.w]}, 'holding_disc_center'],
+    ['holding_disc_forehand', {true: [keys.w], false: [keys.q]}, 'holding_disc_center'],
+    ['holding_disc_forehand', {true: [keys.q], false: [keys.w]}, 'holding_disc_backhand'],
 
-    ['holding_disc_forehand', {true: [keys.space], false: []}, 'throwing_disc_forehand'],
-    ['throwing_disc_forehand', {true: [], false: [keys.space]}, 'holding_disc_forehand'],
-    
+    ['holding_disc_backhand', {true: [keys.e], false: [keys.w]}, 'holding_disc_forehand'],
+    ['holding_disc_backhand', {true: [keys.w], false: [keys.e]}, 'holding_disc_center'],
+
+    ['holding_disc_forehand', {true: [keys.throw_disc], false: []}, 'throwing_disc_forehand'],
+    ['throwing_disc_forehand', {true: [keys.threw_disc], false: []}, 'idle'],
+
+    ['holding_disc_backhand', {true: [keys.throw_disc], false: []}, 'throwing_disc_backhand'],
+    ['throwing_disc_backhand', {true: [keys.threw_disc], false: []}, 'idle'],
+
+
+    // ['throwing_disc_forehand', {true: [keys.throw_disc], false: []}, 'idle'],
+    // ['throwing_disc_backhand', {true: [keys.throw_disc], false: []}, 'idle'],
+    // ['holding_disc_center', {true: [keys.throw_disc], false: []}, 'idle'],
 
 
 ]
+
+
+const velocity_handler = {
+    'idle': function(args){
+        let {cur_vel} = args;
+        return Math.max(0, cur_vel - 0.01);
+    },
+
+    'jogging': function(args){
+        let {cur_vel} = args;
+        return Math.min(0.3, cur_vel + 0.005)
+    },
+
+    'running': function(args){
+        let {cur_vel} = args;
+        return Math.min(0.6, cur_vel + 0.01)
+    },
+
+    'dive_left': function(args){
+        let {cur_vel, anim_time} = args;
+        if(anim_time < 0.4)
+            return Math.max(0,cur_vel - 0.02)
+        if(anim_time < 1)
+            return cur_vel;
+        
+        return Math.max(0, cur_vel - 0.01)
+    },
+
+    'dive_right': function(args){
+        let {cur_vel, anim_time} = args;
+        if(anim_time < 0.4)
+            return Math.max(0,cur_vel - 0.02)
+        if(anim_time < 1)
+            return cur_vel;
+        
+        return Math.max(0, cur_vel - 0.01)
+    },
+
+    'jogging_vertical': function(args){
+        let {cur_vel, anim_time} = args;
+        if(anim_time < 0.6)
+            // return Math.max(0,cur_vel - 0.007)
+            return 0.1
+
+        
+        return 0.3;
+    },
+
+    'holding_disc_center': function(args){
+        let {cur_vel} = args;
+        return Math.max(0, cur_vel - 0.05)
+    }, 
+
+    'jog_backwards': function(args){
+        let {cur_vel} = args;
+        return Math.max(-0.2, cur_vel - 0.005)
+    },    
+
+    
+
+    
+}
+
 
 
 
@@ -902,16 +1165,17 @@ var disc_flight_params = {
     time: 1
 }
 
-gui.add(disc_flight_params, 'C1').min(0.0)
-gui.add(disc_flight_params, 'C2')
-gui.add(disc_flight_params, 'C3')
-gui.add(disc_flight_params, 'theta').min(0.0).max(90)
-gui.add(disc_flight_params, 'AOT').min(-Math.PI/2).max(Math.PI/2)
-gui.add(disc_flight_params, 'forceX').min(-30.0).max(30.0)
-gui.add(disc_flight_params, 'forceY').min(-5.0).max(40.0)
-gui.add(disc_flight_params, 'forceZ').min(-30.0).max(30.0)
-gui.add(disc_flight_params, 'g').min(-20).max(-5)
-gui.add(disc_flight_params, 'time').min(0.001).max(10)
+var disc_gui = gui.addFolder('Disc Parameters');
+disc_gui.add(disc_flight_params, 'C1').min(0.0)
+disc_gui.add(disc_flight_params, 'C2')
+disc_gui.add(disc_flight_params, 'C3')
+disc_gui.add(disc_flight_params, 'theta').min(0.0).max(90)
+disc_gui.add(disc_flight_params, 'AOT').min(-Math.PI/2).max(Math.PI/2)
+disc_gui.add(disc_flight_params, 'forceX').min(-30.0).max(30.0)
+disc_gui.add(disc_flight_params, 'forceY').min(-5.0).max(40.0)
+disc_gui.add(disc_flight_params, 'forceZ').min(-30.0).max(30.0)
+disc_gui.add(disc_flight_params, 'g').min(-20).max(-5)
+disc_gui.add(disc_flight_params, 'time').min(0.001).max(10)
 
 
 
@@ -1037,8 +1301,9 @@ class DiscEntity {
             let AOM = this.velocity.angleTo(new Vector3(v.x, 0, v.z))
 
             let AOT = THROW.AOT           // angle of tilt
-
-
+            if(AOT < -Math.PI/2 || AOT > Math.PI/2){
+                
+            }
 
 
             if(v.y < 0) AOM *= -1;
@@ -1103,7 +1368,9 @@ class DiscEntity {
             let drag = d1 + d2;
 
 
-
+            // if(flight_case == 4){
+            //     lift *= 2
+            // }
 
 
             // console.log('Lift: ',lift - disc_flight_params.g, 'Drag: ',drag)
@@ -1284,7 +1551,7 @@ class DiscEntity {
         for(let t = ang - 5*Math.PI/12; t <= ang + 5*Math.PI/12; t += Math.PI/48){
             // console.log('computing for angle:',(t-ang)*180/Math.PI)
             let v = new Vector2(cos(t),sin(t)).multiplyScalar(10);
-            let v3 = new Vector3(v.x,0,v.y).add(this.mesh.position);
+            let v3 = new Vector3(v.x,0,v.y).add(PLAYERS[this.state.playerID].center_bone.getWorldPosition(new Vector3()));
             // console.log(v3)
             res[t] = screenXY(v3,PLAYER.camera.camera)
 
@@ -1308,9 +1575,6 @@ scene.add(arcLine)
 var DISC;
 
 document.addEventListener('keydown', e => {
-    // if(e.key.toLowerCase() == 't'){
-    //     DISC.throw()
-    // }
     if(e.key == '1'){
         PLAYER.animations['throw_disc_forehand'].play();
     }
@@ -1354,7 +1618,7 @@ function computeArc(){
     }
     let y_change = (res[ans].y - screenMouse.y) * 0.04;
     y_change = Math.min(y_change, 15);
-    y_change = Math.max(y_change, -3);
+    y_change = Math.max(y_change, -6);
 
     arcPoints[ind].y += y_change;
 
@@ -1505,10 +1769,25 @@ const tick = () =>
             scene.remove(arcLine)
         }
 
+        if(PLAYER.state != 'dive_right' && PLAYER.state != 'dive_left'){
+
+            if(DISC.state.playerID == PLAYER_ID){
+                let look = PLAYER.entity.position.clone();
+                PLAYER.camera.camera.lookAt(look.setY(5))
+            }
+            else{
+                let look = PLAYER.entity.position.clone();
+                PLAYER.camera.camera.lookAt(look.setY(3))
+            }
+        }
+
+
+        if(PLAYER.entity.position.y != 0) console.log('player posY:',PLAYER.entity.position.y)
+
         
     }
     catch(e){}//console.log(e)}
-    controls.update()
+    // controls.update()
     try{renderer.render(scene, PLAYER.camera.camera)}
     catch(e){renderer.render(scene, camera)}
 
@@ -1624,6 +1903,8 @@ socket.on('playerState', data => {
 socket.on('playerPosition', data => {
     // data: {id,pos}
 
+    console.log('Socket::player position changed:',data)
+
     setVector(PLAYERS[parseInt(data.id)].entity.position, data.position)
 })
 
@@ -1663,12 +1944,36 @@ socket.on('removePlayer', data => {
 })
 
 
+setInterval(()=>{
+    socket.emit('ping',{start: new Date().getTime()})
+}, 2000)
+
+socket.on('ping', data => {
+    // data: {start}
+    let d = new Date().getTime();
+    document.getElementById('ping-value').innerHTML = d-data.start;
+})
+
+
 document.addEventListener('keydown',e=>{
     if(e.key == '`'){
         if(PLAYER.entity != undefined && PLAYER_ID != undefined)
             socket.emit('playerPosition',{id:PLAYER_ID,position:PLAYER.entity.position})
     }
-    else if(e.key == '8'){
-        console.log(DISC.mesh.position)
+    else if(e.key == 'p'){
+        let d = new Date().getTime();
+        socket.emit('ping',{start:d});
+    }
+})
+
+window.addEventListener('wheel', e => {
+    // console.log(e)
+    if(DISC.state.playerID == PLAYER_ID){
+        if(e.deltaY < 0)
+            // THROW.AOT = Math.max(-Math.PI/3,THROW.AOT - 0.2)
+            THROW.AOT -= 0.2
+        else
+            THROW.AOT += 0.2
+            // THROW.AOT = Math.min(Math.PI/3,THROW.AOT + 0.2)
     }
 })
