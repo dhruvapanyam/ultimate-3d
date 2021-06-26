@@ -58,19 +58,19 @@ io.on('connection', (client) => {
 
 
     client.on('playerVelocity',function(data){
-        players[data.id].velocity = data.velocity;
+        if(players[data.id] != undefined) players[data.id].velocity = data.velocity;
         client.broadcast.emit('playerVelocity',{id:data.id,velocity:data.velocity})
     })
 
     client.on('playerPosition',function(data){
         console.log('changing position of',data.id)
-        players[data.id].position = data.velocity;
+        if(players[data.id] != undefined) players[data.id].position = data.velocity;
         console.log(data.position)
         client.broadcast.emit('playerPosition',{id:data.id,position:data.position})
     })
 
     client.on('playerRotation',function(data){
-        players[data.id].rotation = data.rotation;
+        if(players[data.id] != undefined) players[data.id].rotation = data.rotation;
         client.broadcast.emit('playerRotation',{id:data.id,rotation:data.rotation})
     })
 
