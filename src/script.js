@@ -286,7 +286,12 @@ class ThirdPersonCamera {
 
         let temp_x,temp_y,temp_z;
 
-        if(DISC.state.playerID != this.controller.id){
+        let rot = ang + this.angle_offset
+        let z_comp = Math.cos(rot);
+        let x_comp = Math.sin(rot);
+        
+
+        if(!PLAYER.holdingDisc() || PLAYER.throwingDisc()){
             // not holding disc, can move around.
             // if(gazeMouse.x != prevGazeMouse.x){
             //     this.angle_offset -= 1 * (gazeMouse.x - prevGazeMouse.x)
@@ -296,32 +301,25 @@ class ThirdPersonCamera {
             this.angle_offset = -gazeMouse.x * 3;
 
             temp_y = 15 + ((gazeMouse.y - 0.4) * 6)
+
+            let bone = new Vector3();
+            this.controller.center_bone.getWorldPosition(bone);
+            if(Math.abs(gazeMouse.y) > 0.3){
+                dist_from_player = Math.max(5,dist_from_player*(1 - (Math.abs(gazeMouse.y) - 0.3)))
+                
+            }
+            temp_x = bone.x - dist_from_player*x_comp
+            temp_z = bone.z - dist_from_player*z_comp
         }
         else{
             this.camera.position.y = 15;
             dist_from_player = 20;
+            temp_x = DISC.mesh.position.x - dist_from_player*x_comp;
+            temp_z = DISC.mesh.position.z - dist_from_player*z_comp;
+            temp_y = 10;
         }
-        let rot = ang + this.angle_offset
-        let z_comp = Math.cos(rot);
-        let x_comp = Math.sin(rot);
-        // // // console.log(x_comp,z_comp)
-
-        if(DISC.state.playerID == this.controller.id){
-            temp_x = obj.position.x - dist_from_player*x_comp;
-            temp_z = obj.position.z - dist_from_player*z_comp;
-
-            // this.camera.lookAt(obj.position.x + 20*x_comp, 15 - this.camera.position.y, obj.position.z + 20*z_comp);
-        }
-        else{
-            let bone = new Vector3();
-            this.controller.center_bone.getWorldPosition(bone);
-            temp_x = bone.x - dist_from_player*x_comp;
-            temp_z = bone.z - dist_from_player*z_comp;
-    
-            // this.camera.lookAt(bone.x + 20*x_comp, 15 - this.camera.position.y, bone.z + 20*z_comp)
-        }
-
-        this.camera.position.lerp(new Vector3(temp_x,temp_y,temp_z), 0.1);
+       
+        this.camera.position.lerp(new Vector3(temp_x,temp_y,temp_z), 0.3);
 
         
 
@@ -400,6 +398,8 @@ const characters = {
 
 
 const intro = 'idle'
+
+var prevPos = new Vector3();
 class CharacterController {
     constructor(id, control=false, position=new Vector3(), rotation=0, velocity=0, states=player_states, transitions=player_transitions ){
 
@@ -493,6 +493,14 @@ class CharacterController {
         this.FSM.addTransition(prev, req, next, options)
     }
 
+    holdingDisc(){
+        return DISC.state.playerID == this.id
+    }
+
+    throwingDisc(){
+        return this.state == 'throwing_disc_forehand' || this.state == 'throwing_disc_backhand'
+    }
+
 
 
     processInput(inp){
@@ -503,7 +511,7 @@ class CharacterController {
         }
 
         else{
-            if(THROW.forward_speed > 0.5 && DISC.state.location == 'hand' && DISC.state.playerID == this.id){
+            if(THROW.forward_speed > 0.5 && this.holdingDisc() && !this.throwingDisc()){
                 // DISC.prepareThrow();
                 // socket.emit('throw',THROW);
 
@@ -511,13 +519,19 @@ class CharacterController {
                 //     this.camera.camera.remove(this.camera.HUD_objects[obj]);
                 // }
                 // DISC.throw();
+                // DISC.prepareThrow();
+
+                console.log('preparing throw')
+                DISC.prepareThrow();
+            
+
 
                 this.input.keys['catch_disc'] = false;
                 this.input.keys['throw_disc'] = true;
                 this.input.keys['threw_disc'] = false;
             }
             else
-                THROW.forward_speed = 0.5;
+                if(!this.holdingDisc()) THROW.forward_speed = 0.5;
         }
 
         if (inp['ShiftLeft'] == true && DISC.state.playerID == this.id){
@@ -557,7 +571,8 @@ class CharacterController {
         let new_state = this.FSM.updateState(inp);
 
         if(new_state == 'throw'){
-            DISC.prepareThrow();
+            // console.log('preparing throw')
+            // DISC.prepareThrow();
             socket.emit('throw',THROW)
             DISC.throw();
 
@@ -658,7 +673,7 @@ class CharacterController {
         if(new_vel != this.velocity){
             this.velocity = new_vel;
             // // console.log('new velocity:',new_vel)
-            socket.emit('playerVelocity',{id:PLAYER_ID, velocity:new_vel})
+            // socket.emit('playerVelocity',{id:PLAYER_ID, velocity:new_vel})
         }
 
         this.entity.translateZ(this.velocity)
@@ -679,6 +694,9 @@ class CharacterController {
         if(flag){
             socket.emit('playerRotation',{id:PLAYER_ID, rotation:this.entity.rotation.y})
         }
+
+        if(prevPos.distanceTo(this.entity.position) > 0) updatePlayerPosition(this.entity.position);
+        prevPos = this.entity.position.clone();
     }
 
 
@@ -1488,7 +1506,7 @@ class DiscEntity {
     }
 
     prepareThrow(){
-        let arc = computeArc();
+        let arc = computeArc(true);
         THROW.direction = arc.direction;
         THROW.upward_speed = arc.y;
     }
@@ -1551,7 +1569,7 @@ class DiscEntity {
         for(let t = ang - 5*Math.PI/12; t <= ang + 5*Math.PI/12; t += Math.PI/48){
             // // console.log('computing for angle:',(t-ang)*180/Math.PI)
             let v = new Vector2(cos(t),sin(t)).multiplyScalar(10);
-            let v3 = new Vector3(v.x,0,v.y).add(PLAYERS[this.state.playerID].center_bone.getWorldPosition(new Vector3()));
+            let v3 = new Vector3(v.x,0,v.y).add(this.mesh.position.clone().setY(3))//(PLAYERS[this.state.playerID].center_bone.getWorldPosition(new Vector3()));
             // // console.log(v3)
             res[t] = screenXY(v3,PLAYER.camera.camera)
 
@@ -1595,10 +1613,12 @@ document.addEventListener('keydown', e => {
     }
 })
 
-function computeArc(){
+function computeArc(print=false){
+    if(!print)console.log('PREPARE func call')
     let arc = DISC.getArc();
 
     let init_angle = arc.init;
+    document.getElementById('init-value').innerHTML = Math.round(init_angle * 100) / 100
     let res = arc.res;
     // // console.log(res);
     let tar = screenMouse.x;
@@ -1616,6 +1636,7 @@ function computeArc(){
         }
         i++;
     }
+    document.getElementById('ans-value').innerHTML = Math.round(ans * 100) / 100
     let y_change = (res[ans].y - screenMouse.y) * 0.04;
     y_change = Math.min(y_change, 15);
     y_change = Math.max(y_change, -6);
@@ -1762,8 +1783,13 @@ const tick = () =>
 
         DISC.update(delta * disc_flight_params.time * 3)
 
-        if(DISC.state.location == 'hand' && DISC.state.playerID == PLAYER_ID){
-            computeArc()
+        // if(PLAYER.throwingDisc()){
+        //     console.log('throwing')
+        // }
+
+        if(PLAYER.holdingDisc()){
+            if(!PLAYER.throwingDisc())
+                computeArc(true)
         }
         else{
             scene.remove(arcLine)
@@ -1771,15 +1797,16 @@ const tick = () =>
 
         if(PLAYER.state != 'dive_right' && PLAYER.state != 'dive_left'){
 
-            if(DISC.state.playerID == PLAYER_ID){
-                let look = PLAYER.entity.position.clone();
+            if(PLAYER.holdingDisc() && !PLAYER.throwingDisc()){
+                let look = DISC.mesh.position.clone();
                 PLAYER.camera.camera.lookAt(look.setY(5))
             }
             else{
                 let look = PLAYER.entity.position.clone();
-                PLAYER.camera.camera.lookAt(look.setY(3))
+                PLAYER.camera.camera.lookAt(look.setY(5))
             }
         }
+        // console.log(gazeMouse.y)
 
 
         // if(PLAYER.entity.position.y != 0) console.log('player posY:',PLAYER.entity.position.y)
@@ -1978,7 +2005,12 @@ window.addEventListener('wheel', e => {
     }
 })
 
-setInterval(()=>{
-    if(PLAYER.entity != undefined && PLAYER_ID != undefined)
-            socket.emit('playerPosition',{id:PLAYER_ID,position:PLAYER.entity.position})
-},1000)
+
+function updatePlayerPosition(pos){
+    socket.emit('playerPosition',{id:PLAYER_ID,position:pos})
+}
+
+// setInterval(()=>{
+//     if(PLAYER.entity != undefined && PLAYER_ID != undefined)
+//             socket.emit('playerPosition',{id:PLAYER_ID,position:PLAYER.entity.position})
+// },1000)
