@@ -543,7 +543,7 @@ class CharacterController {
         if(inp[keys.c] == true){
             // console.log(DISC)
         }
-        if(inp[keys.c] == true && DISC.state.location != 'hand'){
+        if((inp[keys.c] == true || inp[keys.j] == true) && DISC.state.location != 'hand'){
             let left_hand = new Vector3();
             let right_hand = new Vector3();
 
@@ -552,7 +552,7 @@ class CharacterController {
 
             // mesh_center.y += 4;
             let catching_dist = 12;
-            if(left_hand.distanceTo(DISC.mesh.position) < catching_dist || right_hand.distanceTo(DISC.mesh.position) < catching_dist){
+            if(inp[keys.j] == true || left_hand.distanceTo(DISC.mesh.position) < catching_dist || right_hand.distanceTo(DISC.mesh.position) < catching_dist){
 
                 socket.emit('discState',{location:'hand',playerID:this.id});
 
@@ -1918,6 +1918,7 @@ socket.on('playerVelocity', data => {
     // data: {id,velocity}
     // // console.log('SOCKET::speed',data)
     // // console.log(PLAYERS[data.id].id)
+    if(PLAYERS[parseInt(data.id)] == undefined) return;
     PLAYERS[parseInt(data.id)].velocity = data.velocity;
 })
 
@@ -1925,11 +1926,13 @@ socket.on('playerRotation', data => {
     // data: {id,rotaiton}
     // // console.log('SOCKET::rotate',data)
     // // console.log(PLAYERS[data.id].id)
+    if(PLAYERS[parseInt(data.id)] == undefined) return;
     PLAYERS[parseInt(data.id)].entity.rotation.y = data.rotation;
 })
 
 socket.on('playerState', data => {
     // data: {id,state}
+    if(PLAYERS[parseInt(data.id)] == undefined) return;
 
     PLAYERS[parseInt(data.id)].updateStateRemote(data.state);
 })
@@ -1938,6 +1941,8 @@ socket.on('playerPosition', data => {
     // data: {id,pos}
 
     // // console.log('Socket::player position changed:',data)
+
+    if(PLAYERS[parseInt(data.id)] == undefined) return;
 
     setVector(PLAYERS[parseInt(data.id)].entity.position, data.position)
 })
@@ -1968,6 +1973,7 @@ socket.on('throw', data => {
 
 socket.on('removePlayer', data => {
     // data: {id}
+    if(PLAYERS[parseInt(data.id)] == undefined) return;
     scene.remove(PLAYERS[data.id].entity);
     delete PLAYERS[data.id];
 
@@ -2004,11 +2010,11 @@ window.addEventListener('wheel', e => {
     // // console.log(e)
     if(DISC.state.playerID == PLAYER_ID){
         if(e.deltaY < 0)
-            // THROW.AOT = Math.max(-Math.PI/3,THROW.AOT - 0.2)
-            THROW.AOT -= 0.2
+            THROW.AOT = Math.max(-Math.PI/3,THROW.AOT - 0.2)
+            // THROW.AOT -= 0.2
         else
-            THROW.AOT += 0.2
-            // THROW.AOT = Math.min(Math.PI/3,THROW.AOT + 0.2)
+            // THROW.AOT += 0.2
+            THROW.AOT = Math.min(Math.PI/3,THROW.AOT + 0.2)
     }
 })
 
