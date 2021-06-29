@@ -1,6 +1,6 @@
 import io from 'socket.io-client';
 console.log(process.env.NODE_ENV)
-const socket = process.env.NODE_ENV === 'production' ? io() : io('http://localhost:8000/');
+const socket = process.env.NODE_ENV === 'production' ? io() : io('http://localhost:9000/');
 
 // ------------------------------ THREE.JS -------------------------------
 
@@ -1788,16 +1788,16 @@ const tick = () =>
 
     // Render
     try{
-        PLAYER.mixer.update(delta * disc_flight_params.time)
+        PLAYER.mixer.update(delta)
         PLAYER.update();
 
         for(let pID in PLAYERS){
             if(pID == PLAYER_ID) continue;
             PLAYERS[pID].updateRemote()
-            PLAYERS[pID].mixer.update(delta * disc_flight_params.time)
+            PLAYERS[pID].mixer.update(delta)
         }
 
-        DISC.update(delta * disc_flight_params.time * 3)
+        DISC.update(delta * 3)
 
         // if(PLAYER.throwingDisc()){
         //     console.log('throwing')
