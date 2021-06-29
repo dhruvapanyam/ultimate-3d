@@ -64,7 +64,7 @@ io.on('connection', (client) => {
 
     client.on('playerPosition',function(data){
         // console.log('changing position of',data.id)
-        if(players[data.id] != undefined) players[data.id].position = data.velocity;
+        if(players[data.id] != undefined) players[data.id].position = data.position;
         // console.log(data.position)
         client.broadcast.emit('playerPosition',{id:data.id,position:data.position})
     })

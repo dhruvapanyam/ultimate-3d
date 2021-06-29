@@ -460,6 +460,8 @@ class CharacterController {
                     this.addTransition(prev, req, next)
                 }
             }
+
+
         
         
             // console.log('Bones:')
@@ -599,6 +601,7 @@ class CharacterController {
             let options = new_state.options;
 
             socket.emit('playerState',{id:PLAYER_ID, state:next});
+    
 
             // console.log(prev,'to',next)
 
@@ -621,6 +624,7 @@ class CharacterController {
                 this.entity.position.z = this.center_bone.getWorldPosition(new Vector3()).z
             }
 
+            updatePlayerPosition(this.entity.position)
 
             // this.animations[next].play()
             // this.animations[prev].fadeOut(0.1)
@@ -673,7 +677,7 @@ class CharacterController {
         if(new_vel != this.velocity){
             this.velocity = new_vel;
             // // console.log('new velocity:',new_vel)
-            // socket.emit('playerVelocity',{id:PLAYER_ID, velocity:new_vel})
+            socket.emit('playerVelocity',{id:PLAYER_ID, velocity:new_vel})
         }
 
         this.entity.translateZ(this.velocity)
@@ -695,7 +699,7 @@ class CharacterController {
             socket.emit('playerRotation',{id:PLAYER_ID, rotation:this.entity.rotation.y})
         }
 
-        if(prevPos.distanceTo(this.entity.position) > 0) updatePlayerPosition(this.entity.position);
+        // if(prevPos.distanceTo(this.entity.position) > 0) updatePlayerPosition(this.entity.position);
         prevPos = this.entity.position.clone();
     }
 
@@ -1803,7 +1807,10 @@ const tick = () =>
             }
             else{
                 let look = PLAYER.entity.position.clone();
-                PLAYER.camera.camera.lookAt(look.setY(5))
+                let ylook = 5;
+                if(gazeMouse.y > 0.3) ylook = 5 - (gazeMouse.y - 0.3) * 5;
+                else if(gazeMouse.y < -0.3) ylook = 5 - (gazeMouse.y + 0.3) * 8
+                PLAYER.camera.camera.lookAt(look.setY(ylook))
             }
         }
         // console.log(gazeMouse.y)
@@ -2010,7 +2017,7 @@ function updatePlayerPosition(pos){
     socket.emit('playerPosition',{id:PLAYER_ID,position:pos})
 }
 
-// setInterval(()=>{
-//     if(PLAYER.entity != undefined && PLAYER_ID != undefined)
-//             socket.emit('playerPosition',{id:PLAYER_ID,position:PLAYER.entity.position})
-// },1000)
+setInterval(()=>{
+    if(PLAYER.entity != undefined && PLAYER_ID != undefined)
+            socket.emit('playerPosition',{id:PLAYER_ID,position:PLAYER.entity.position})
+},2000)
