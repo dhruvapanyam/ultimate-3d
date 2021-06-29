@@ -1622,7 +1622,7 @@ function computeArc(print=false){
     let arc = DISC.getArc();
 
     let init_angle = arc.init;
-    document.getElementById('init-value').innerHTML = Math.round(init_angle * 100) / 100
+    // document.getElementById('init-value').innerHTML = Math.round(init_angle * 100) / 100
     let res = arc.res;
     // // console.log(res);
     let tar = screenMouse.x;
@@ -1640,7 +1640,7 @@ function computeArc(print=false){
         }
         i++;
     }
-    document.getElementById('ans-value').innerHTML = Math.round(ans * 100) / 100
+    // document.getElementById('ans-value').innerHTML = Math.round(ans * 100) / 100
     let y_change = (res[ans].y - screenMouse.y) * 0.04;
     y_change = Math.min(y_change, 15);
     y_change = Math.max(y_change, -6);
@@ -1756,6 +1756,11 @@ let prev = 0
 let onfield = false
 let prevIntersect = new Vector3(0,0,0)
 
+let fps = []
+for(let i=0;i<100;i++) fps.push(1/60)
+let fpssum = 100/60;
+let counter = 0;
+
 
 const tick = () =>
 {
@@ -1763,6 +1768,13 @@ const tick = () =>
     const elapsedTime = clock.getElapsedTime()
     let delta = elapsedTime - prev
     prev = elapsedTime
+
+    fpssum += delta - fps[counter];
+    fps[counter] = delta;
+    document.getElementById('fps-value').innerHTML = Math.round(100/fpssum);
+
+    counter = (counter+1)%100;
+
 
     // try{raycaster.setFromCamera( mouse, PLAYER.camera.camera );}
     // catch(e){raycaster.setFromCamera( mouse, camera );}
