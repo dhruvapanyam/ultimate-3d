@@ -1,0 +1,39 @@
+-------- THROWER --------
+
+holding_disc_center
+holding_disc_forehand
+holding_disc_backhand
+pump_fake_forehand*
+pump_fake_backhand*
+throwing_disc_forehand
+throwing_disc_backhand
+pivot_right_forehand*
+pivot_right_backhand*
+pivot_left_forehand*
+pivot_left_backhand*
+
+
+-------- CUTTER ---------
+
+idle_offence
+jogging
+running
+sprint_turn_left
+sprint_turn_right
+turn_around
+jogging_backwards
+catching*
+jumping*
+vertical
+diving_left
+diving_right
+strafe_left*
+strafe_right*
+
+
+-------- DEFENCE ---------
+
+idle_defence
+shuffle_left
+shuffle_right
+stalling*

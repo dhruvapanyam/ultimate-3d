@@ -36,12 +36,12 @@ var ids = {};
 var userID = 0;
 
 io.on('connection', (client) => {
-    console.log(`${client.id} connected`);
 
     userID++;
 
     ids[client.id] = userID;
 
+    console.log(userID,'has connected!')
     client.emit('init',{players: players, disc: disc, id: userID})
 
     client.on('newPlayer',function(data){
@@ -59,13 +59,15 @@ io.on('connection', (client) => {
 
     client.on('playerVelocity',function(data){
         if(players[data.id] != undefined) players[data.id].velocity = data.velocity;
+        // if(data.show) console.log(data.velocity)
+        // console.log(data.show)
         client.broadcast.emit('playerVelocity',{id:data.id,velocity:data.velocity})
     })
 
     client.on('playerPosition',function(data){
         // console.log('changing position of',data.id)
         if(players[data.id] != undefined) players[data.id].position = data.position;
-        // console.log(data.position)
+        // console.log('Position:',data.position)
         client.broadcast.emit('playerPosition',{id:data.id,position:data.position})
     })
 
@@ -107,7 +109,8 @@ io.on('connection', (client) => {
         delete players[ids[client.id]];
         delete ids[client.id];
 
-        console.log(players)
+        console.log('Players remaining:',Object.keys(players).length);
+        // console.log(players)
     })
 
 
@@ -121,4 +124,4 @@ io.on('connection', (client) => {
 
 })
 
-server.listen(process.env.PORT || 9000, ()=>{console.log('Listening on port 8000...')})
+server.listen(process.env.PORT || 8000, ()=>{console.log('Listening on port 8000...')})

@@ -1,6 +1,6 @@
 import io from 'socket.io-client';
 console.log(process.env.NODE_ENV)
-const socket = process.env.NODE_ENV === 'production' ? io() : io('http://localhost:9000/');
+const socket = process.env.NODE_ENV === 'production' ? io() : io('http://localhost:8000/');
 
 // ------------------------------ THREE.JS -------------------------------
 
@@ -14,6 +14,8 @@ import { AnimationMixer, Vector2, Vector3 } from 'three'
 
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js'
+
+import {keys, player_states, player_transitions, velocity_handler, side_velocity_handler, player_animations} from './state_manager'
 
 
 const sin = Math.sin;
@@ -138,11 +140,36 @@ const FIELD = new THREE.Line(fieldGeometry, fieldLineMaterial)
 scene.add(FIELD)
 
 
+var ANIMATIONS = {};
+var MODELS = {};
+
+
+var asset_loaders = {
+    'animations': 0,
+    'disc': 0
+}
+
+loadModel('disc1', model=>{MODELS['disc'] = model})
+
+function init_assets(character){
+    asset_loaders[character] = 0
+    loadModel(character, model=>{MODELS[character] = model; asset_loaders[character] = 100;})
+}
+
+for(let character of ['shannon']){
+    init_assets(character)
+}
+
+loadAnimation(player_animations, anims=>{for(let a in anims) ANIMATIONS[a] = anims[a]; asset_loaders['animations'] = 100});
+
+
+
 function loadModel(model_path, callback){
     fbxLoader.load(
         './models/'+model_path+'.fbx',
         function(obj){
             // console.log(model_path,obj)
+            console.log('loadModel')
             obj.scale.set(0.05,0.05,0.05)
             obj.traverse(node=>{if(node.isMesh){node.castShadow=true;node.receiveShadow=true;}})
             callback(obj)
@@ -150,18 +177,32 @@ function loadModel(model_path, callback){
     )
 }
 
-function loadAnimation(anim_path, callback){
+function loadAnimation(anim_set, callback){
     fbxLoader.load(
-        './models/animations/'+anim_path+'.fbx',
+        './models/animations/mannequin/animations.fbx',
         function(obj){
-            // console.log('loadAnimation:',anim_path,obj)
-            if(anim_path == 'mannequin/throw_back')
-                callback(anim_path, obj.animations[1])
-            else
-                callback(anim_path, obj.animations[0])
+            console.log('loadAnimation')
+            let anims = {}
+            for(let clip of obj.animations){
+                let cname = clip.name.split('Armature|')[1];
+                if(anim_set.has(cname)){
+                    // console.log('Extracting animations clip:',cname,clip)
+                    anims[cname] = clip;
+
+                }
+            }
+            callback(anims)
+
         }
     )
 }
+
+
+
+
+// set of IDs of players in the room currently
+var online_players = new Set();
+
 
 
 
@@ -198,11 +239,9 @@ class ThirdPersonCamera {
         //
 
         this.minimap_players = {}
-        for(let pid in PLAYERS){
-            this.minimap_players[pid] = this.createHUD({type: 'circle', radius: 0.2, angle: Math.PI*2}, new THREE.MeshBasicMaterial({color:'red'}),{x:0,y:4})
-            this.minimap_players[pid].position.set(0,0,0)
-            this.minimap.add(this.minimap_players[pid])
-        }
+        // for(let pid in PLAYERS){
+        //     this.addMiniPlayer(pid)
+        // }
 
         this.minimap_disc = this.createHUD({type: 'circle', radius: 0.2, angle: Math.PI*2}, new THREE.MeshBasicMaterial({color:'blue'}),{x:0,y:4})
         this.minimap_disc.position.set(0,0,0)
@@ -217,6 +256,21 @@ class ThirdPersonCamera {
 
         // this.minimap_field = this.createHUD({type: 'plane', width: 0.9*37/3, height: 0.9*100/3}, new THREE.MeshBasicMaterial({color: 'white'}), {x:100-0.9*37/3, y:0.9*100/3})
     }
+
+    addMiniPlayer(pid){
+        console.log('adding to minimap:',pid)
+        this.minimap_players[pid] = this.createHUD({type: 'circle', radius: 0.2, angle: Math.PI*2}, new THREE.MeshBasicMaterial({color:'red'}),{x:0,y:4})
+        this.minimap_players[pid].position.set(0,0,0)
+        this.minimap.add(this.minimap_players[pid])
+    }
+
+    removeMiniPlayer(pid){
+        console.log('removing from minimap:',pid)
+        this.minimap.remove(this.minimap_players[pid])
+        delete this.minimap_players[pid];
+    }
+
+
 
     createHUD(dim, mat, pos){       // format: dim = {type, width: w%, height: h%}, pos = {x,y} (for top-left corner)
         let mesh, center;
@@ -287,6 +341,11 @@ class ThirdPersonCamera {
         let temp_x,temp_y,temp_z;
 
         let rot = ang + this.angle_offset
+
+        if(PLAYER.state == 'turning_back'){
+            let anim_elapsed = this.controller.animations['turn_back'].time;
+            rot -= Math.PI * anim_elapsed/0.6
+        }
         let z_comp = Math.cos(rot);
         let x_comp = Math.sin(rot);
         
@@ -312,14 +371,33 @@ class ThirdPersonCamera {
             temp_z = bone.z - dist_from_player*z_comp
         }
         else{
-            this.camera.position.y = 15;
+            // this.camera.position.y = 15;
             dist_from_player = 20;
             temp_x = DISC.mesh.position.x - dist_from_player*x_comp;
             temp_z = DISC.mesh.position.z - dist_from_player*z_comp;
-            temp_y = 10;
+            temp_y = 13;
         }
        
-        this.camera.position.lerp(new Vector3(temp_x,temp_y,temp_z), 0.3);
+        this.camera.position.lerp(new Vector3(temp_x,temp_y,temp_z), 0.1);
+
+
+        // if(this.controller.state != 'dive_right' && this.controller.state != 'dive_left'){
+
+        if(this.controller.holdingDisc() && !this.controller.throwingDisc()){
+            let look = DISC.mesh.position.clone().setY(5)
+            look.x += 5 * sin(this.controller.entity.rotation.y)
+            look.z += 5 * cos(this.controller.entity.rotation.y)
+            
+            this.camera.lookAt(look)
+        }
+        else{
+            let look = this.controller.entity.position.clone();
+            let ylook = 5;
+            if(gazeMouse.y > 0.3) ylook = 5 - (gazeMouse.y - 0.3) * 5;
+            else if(gazeMouse.y < -0.3) ylook = 5 - (gazeMouse.y + 0.3) * 8
+            this.camera.lookAt(look.setY(ylook))
+        }
+        // }
 
         
 
@@ -356,7 +434,17 @@ class ThirdPersonCamera {
 
         // this.minimap_players[this.controller.id].position.x -= 0.001
 
+
         for(let pid in this.minimap_players){
+            if(!online_players.has(parseInt(pid)) && !online_players.has(pid)) this.removeMiniPlayer(pid)
+            // console.log(online_players.has(pid))
+        }
+
+        for(let pid of online_players){
+            if(PLAYERS[pid] == undefined || PLAYERS[pid].loading == true) continue;
+
+            if(this.minimap_players[pid] == undefined) this.addMiniPlayer(pid);
+            // console.log(pid) 
             let scaleH = PLAYERS[pid].entity.position.z / (fieldLength/2);
             let scaleW = PLAYERS[pid].entity.position.x / (fieldWidth/2);
 
@@ -397,21 +485,28 @@ const characters = {
 }
 
 
-const intro = 'idle'
+const intro = 'idle_offence'
 
 var prevPos = new Vector3();
 class CharacterController {
-    constructor(id, control=false, position=new Vector3(), rotation=0, velocity=0, states=player_states, transitions=player_transitions ){
+    constructor(id, character, control=false){
 
         this.id = id;
+        this.character = character;
+        this.velocity = [0,0];
+        this.loading = true;
+        this.control = control;
+    }
 
-        this.character = 'shannon';
+    loadAssets(){
+        if(MODELS[this.character] != undefined){
 
-        loadModel(this.character, model => {
-            // console.log('character controller constructor')
-            this.entity = model;
+            console.log('Loading assets for player',this.id)
 
-
+            this.entity = MODELS[this.character]
+            delete MODELS[this.character];
+            init_assets(this.character)
+            // this.entity.scale.set(0.0025,0.0025,0.0025)
 
             this.bones = {};
             let cur = [this.entity.children[characters[this.character].bone]];
@@ -430,60 +525,68 @@ class CharacterController {
             this.mixer = new THREE.AnimationMixer(this.entity.children[characters[this.character].bone])
             scene.add(this.entity)
             this.animations = {}
+
             // console.log('Controllable Player?',control)
-            if(control){
+            if(this.control == true){
                 this.camera = new ThirdPersonCamera(this);
                 this.input = new CharacterControllerInput(this)
-                this.FSM = new FiniteStateMachine(this, states)
-            }
-            else{
-                this.current_anim = 'idle'
-            }
-            this.state = 'idle'
-            this.velocity = velocity;
+                this.FSM = new FiniteStateMachine(this, player_states)
 
-            setVector(this.entity.position,position)
-            this.entity.rotation.y = rotation
-        
-            for(let s in states){
-                loadAnimation(characters[this.character].anim_path + states[s][0], (path,anim) => {
-                    // // console.log('adding animation:',path)
-                    this.addAnimation(path,anim)
-                })
-            }
-
-            if(control){
-            
-                for(let trans of transitions){
+                for(let trans of player_transitions){
                     let [prev, req, next] = trans;
                     // // console.log('Prev:',prev,'Req:',req,'Next:',next)
                     this.addTransition(prev, req, next)
                 }
             }
+            else{
+                this.current_anim = 'idle_offence'
+            }
 
 
-        
-        
-            // console.log('Bones:')
-            // console.log(this.bones)
+            this.state = 'idle'
+            // this.velocity = velocity;
 
-            // console.log('this:',this)
+            // setVector(this.entity.position,position)
+            // this.entity.rotation.y = rotation
 
-        })
+            for(let clipname in ANIMATIONS){
+                this.addAnimation(clipname, ANIMATIONS[clipname]);
+            }
+            asset_loaders['player'+String(this.id)] = 100;
 
+            this.loading = false;
+
+            // setInterval(()=>{
+            //     this.broadcast()
+            // },2000)
+        }
+
+        else{
+            // console.log('Waiting for assets')
+        }
 
     }
 
+    updatePlayerPosition(){
+        socket.emit('playerPosition', {id:this.id, position:this.entity.position})
+    }
+    updatePlayerRotation(){
+        socket.emit('playerRotation', {id:this.id, rotation:this.entity.rotation.y})
+    }
+    updatePlayerVelocity(show=false){
+        socket.emit('playerVelocity', {id:this.id, velocity:this.velocity, show:show})
+    }
+
+    broadcast(){
+        this.updatePlayerPosition()
+        this.updatePlayerRotation()
+        this.updatePlayerVelocity()
+    }
+
     addAnimation(path,anim){
-        let temp = this.mixer.clipAction(anim)
-        // temp.timeScale = 60
-        path = path.split('/')[1]
-        this.animations[path] = temp
-        // // // console.log(this.animations['idle'])
-        // console.log(path,this.animations[path])
-        // // console.log('CharacterController::addAnimation:',path);
-        if(path == intro) {this.animations[path].play();}
-        if(path == 'vertical') this.animations[path].setLoop(THREE.LoopOnce)
+
+        this.animations[path] = this.mixer.clipAction(anim)
+        if(path == intro) this.animations[path].play();
 
 
         // // console.log(this)
@@ -509,7 +612,7 @@ class CharacterController {
 
         if (inp[keys.space] == true){
             // this.throw_speed = Math.min(this.throw_speed + 0.05, 3);
-            if(DISC.state.playerID == this.id) THROW.forward_speed = Math.min(THROW.forward_speed + 0.5, 30);
+            if(DISC.state.playerID == this.id) THROW.forward_speed = Math.min(THROW.forward_speed + 0.8, 30);
         }
 
         else{
@@ -603,7 +706,7 @@ class CharacterController {
             socket.emit('playerState',{id:PLAYER_ID, state:next});
     
 
-            // console.log(prev,'to',next)
+            console.log(prev,'to',next)
 
             // // console.log('CharacterController::processInput: Transitioning from',prev,'to',next,'! Options:',options);
 
@@ -624,10 +727,13 @@ class CharacterController {
                 this.entity.position.z = this.center_bone.getWorldPosition(new Vector3()).z
             }
 
-            updatePlayerPosition(this.entity.position)
+            if(prev == 'turn_back'){
+                this.entity.rotation.y += Math.PI
+            }
+
+            this.broadcast()
 
             // this.animations[next].play()
-            // this.animations[prev].fadeOut(0.1)
             // this.animations[next].fadeIn(0.2)
             // this.animations[prev].stop()
 
@@ -635,7 +741,8 @@ class CharacterController {
             // this.animations[next].crossFadeFrom(this.animations[prev], 0.2, true)
 
             this.animations[next].play()
-            this.animations[prev].stop()
+            this.animations[prev].fadeOut(0.25)
+            // this.animations[prev].stop()
             
             
             // // console.log('Playing animation:',next)
@@ -650,53 +757,47 @@ class CharacterController {
         
     }
 
-    updateVelocity(){
-        let new_vel = this.velocity;
+    updateVelocity(delta){
+        let new_vel = [this.velocity[0], this.velocity[1]];
 
         if(velocity_handler[this.state] != undefined){
             let options = {
-                cur_vel: this.velocity,
+                cur_vel: this.velocity[0],
                 anim_time: this.animations[this.FSM.states[this.state].animation].time
             }
-            new_vel = velocity_handler[this.state](options);
+            new_vel[0] = velocity_handler[this.state](options);
         }
-        // if(this.state == 'idle'){
-        //     new_vel = Math.max(0, this.velocity - 0.01)
-        // }
-        // else if(this.state == 'jogging'){
-        //     new_vel = Math.min(this.velocity+0.005, 0.3);
-        // }
-        // else if(this.state == 'running'){
-        //     new_vel = Math.min(this.velocity+0.01, 0.6);
-        // }
 
-        // if(DISC.state.playerID == this.id){
-        //     new_vel = Math.max(0, this.velocity - 0.05);
-        // }
+        if(side_velocity_handler[this.state] != undefined){
+            let options = {
+                cur_vel: this.velocity[1],
+                anim_time: this.animations[this.FSM.states[this.state].animation].time
+            }
+            new_vel[1] = side_velocity_handler[this.state](options);
+        }
 
-        if(new_vel != this.velocity){
+        // console.log(this.velocity[0] - new_vel[0]);
+        // console.log(this.velocity)
+
+        if(new_vel[0] != this.velocity[0] || new_vel[1] != this.velocity[1]){
             this.velocity = new_vel;
-            // // console.log('new velocity:',new_vel)
-            socket.emit('playerVelocity',{id:PLAYER_ID, velocity:new_vel})
+            // console.log('new velocity:',new_vel)
+            this.updatePlayerVelocity(true)
         }
 
-        this.entity.translateZ(this.velocity)
+        let transZ = this.velocity[0] * delta
+        let transX = this.velocity[1] * delta
+
+        this.entity.translateZ(transZ)
+        this.entity.translateX(transX)
 
 
         let flag = 0;
-        // if(DISC.state.playerID != this.id){
-        //     // not holding disc, can move around.
-        //     if(gazeMouse.x != prevGazeMouse.x){
-        //         this.entity.rotation.y -= 15 * (gazeMouse.x - prevGazeMouse.x)
-        //         prevGazeMouse.x = gazeMouse.x;
-        //         flag = 1
-        //     }
-        // }
-
         if(this.input.keys[keys.d] == true) {this.entity.rotation.y -= Math.PI/60; flag = 1;}
         else if(this.input.keys[keys.a] == true) {this.entity.rotation.y += Math.PI/60; flag = 1;}
         if(flag){
-            socket.emit('playerRotation',{id:PLAYER_ID, rotation:this.entity.rotation.y})
+            // socket.emit('playerRotation',{id:PLAYER_ID, rotation:this.entity.rotation.y})
+            this.updatePlayerRotation()
         }
 
         // if(prevPos.distanceTo(this.entity.position) > 0) updatePlayerPosition(this.entity.position);
@@ -704,19 +805,47 @@ class CharacterController {
     }
 
 
-    update(){
+    update(delta){
 
+        if(this.loading){
+            this.loadAssets()
+            return;
+        }
+
+        this.mixer.update(delta)
         this.camera.update(this.entity)
-
+        this.updateVelocity(delta)
         this.processInput(this.input.keys)
 
-        this.updateVelocity()
+        if(this.throwingDisc()){
+            console.log('throwing')
+        }
+
+        if(this.holdingDisc()){
+            if(!this.throwingDisc())
+                computeArc(true)
+        }
+        else{
+            scene.remove(arcLine)
+        }        
 
         
     }
 
-    updateRemote(){
-        this.entity.translateZ(this.velocity);
+    updateRemote(delta){
+        if(this.loading){
+            this.loadAssets()
+            return;
+        }
+
+        this.mixer.update(delta)
+
+        // console.log(this.velocity)
+
+        let transZ = delta * this.velocity[0]
+        let transX = delta * this.velocity[1]
+        this.entity.translateZ(transZ);
+        this.entity.translateX(transX);
     }
 
     updateStateRemote(new_state){
@@ -726,7 +855,7 @@ class CharacterController {
         let next = new_state
         // let options = new_state.options;
 
-        // // console.log(prev,'to',next)
+        console.log(prev,'to',next,'(remote)')
 
         // // console.log('CharacterController::processInput: Transitioning from',prev,'to',next,'! Options:',options);
 
@@ -739,7 +868,8 @@ class CharacterController {
         // this.animations[prev].fadeOut(0.5)
         // this.animations[next].fadeIn(0.5)
         this.animations[next].play()
-        this.animations[prev].stop()
+        this.animations[prev].fadeOut(0.25)
+        // this.animations[prev].stop()
         // // console.log('Playing animation:',next)
 
         
@@ -752,9 +882,9 @@ class CharacterControllerInput {
     constructor(controller){
         this.controller = controller
         this.keys = {}
-        let inp_keys = ['KeyQ','KeyW','KeyE','KeyR','KeyA','KeyC','KeyS','KeyD','KeyH','KeyJ','Space','ShiftLeft','ShiftRight','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','catch_disc','throw_disc','threw_disc']
+        // let inp_keys = ['KeyQ','KeyW','KeyE','KeyR','KeyA','KeyC','KeyS','KeyD','KeyH','KeyJ','Space','ShiftLeft','ShiftRight','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','catch_disc','throw_disc','threw_disc']
         // let inp_keys = ['q','w','e','a','s','d','h','j',' ','shift','arrowup','arrowdown','arrowleft','arrowright']
-        for(let inp of inp_keys) this.keys[inp] = false;
+        for(let inp in keys) this.keys[keys[inp]] = false;
 
         document.addEventListener('keydown',(e)=>{
             let k = e.code//.toLowerCase()
@@ -947,225 +1077,30 @@ class FSMState {
 
 var PLAYERS = {};
 
+
 var PLAYER;
 var PLAYER_ID;
 
+// var key_bindings = {
+//     'Jog': keys.w,
+//     'Run': keys.Lshift + ' ' + keys.w,
+//     'Jog Backwards': keys.s,
+//     'Turn Left': keys.a,
+//     'Turn Right': keys.d,
+//     'Look Left': 'mousemove',
+//     'Look Right': 'mousemove',
+//     'Catch': keys.c,
+//     'Jump Catch': keys.space,
+//     'Dive Left': keys.q,
+//     'Dive Right': keys.e,
 
-var _idle = 'idle'
-var _jogging = 'jogging'
-var _jog_backwards = 'jog_backwards'
-var _shuffle_left = 'shuffle_left'
-var _shuffle_right = 'shuffle_right'
-var _running = 'running'
-var _jump = 'vertical'
-var _dive_left = 'dive_left'
-var _dive_right = 'dive_right'
-var _hold_center = 'hold_disc_center'
-var _hold_fore = 'hold_fore'
-var _hold_back = 'hold_backhand'
-var _throw_fore = 'throw_forehand'
-var _throw_back = 'throw_back'
+// }
 
+// var bindings_gui = gui.addFolder('Key Bindings')
 
-
-const keys = {
-    q: 'KeyQ',
-    w: 'KeyW',
-    e: 'KeyE',
-    r: 'KeyR',
-    a: 'KeyA',
-    s: 'KeyS',
-    d: 'KeyD',
-    f: 'KeyF',
-    z: 'KeyZ',
-    x: 'KeyX',
-    c: 'KeyC',
-    v: 'KeyV',
-    space: 'Space',
-    Lshift: 'ShiftLeft',
-    Rshift: 'ShiftRight',
-    h: 'KeyH',
-    t: 'KeyT',
-    j: 'KeyJ',
-    up: 'ArrowUp',
-    down: 'ArrowDown',
-    left: 'ArrowLeft',
-    right: 'ArrowRight',
-
-    catch_disc: 'catch_disc',
-    throw_disc: 'throw_disc',
-    threw_disc: 'threw_disc'
-}
-
-
-var key_bindings = {
-    'Jog': keys.w,
-    'Run': keys.Lshift + ' ' + keys.w,
-    'Jog Backwards': keys.s,
-    'Turn Left': keys.a,
-    'Turn Right': keys.d,
-    'Look Left': 'mousemove',
-    'Look Right': 'mousemove',
-    'Catch': keys.c,
-    'Jump Catch': keys.space,
-    'Dive Left': keys.q,
-    'Dive Right': keys.e,
-
-}
-
-var bindings_gui = gui.addFolder('Key Bindings')
-
-for(let k in key_bindings){
-    bindings_gui.add(key_bindings, k)
-}
-
-
-const player_states = {
-    // state_name: [anim_name, timeout]
-
-    'idle': [_idle, null],
-    'jogging': [_jogging, null],
-    'jog_backwards': [_jog_backwards, null],
-    'shuffle_left': [_shuffle_left, null],
-    'shuffle_right': [_shuffle_right, null],
-    'running': [_running, null],
-    'idle_vertical': [_jump, [1.2, 'idle']],
-    'jogging_vertical': [_jump, [1.2, 'jogging']],
-
-    'dive_left': [_dive_left, [2.3, 'idle']],
-    'dive_right': [_dive_right, [2.3, 'idle']],
-    // 'running_vertical': ['jump_catch', [2, 'running']],
-    
-    'holding_disc_center': [_hold_center, null],
-    'holding_disc_forehand': [_hold_fore, null],
-    'holding_disc_backhand': [_hold_back, null],
-    'throwing_disc_forehand': [_throw_fore, [0.5, 'throw']],
-    'throwing_disc_backhand': [_throw_back, [1, 'throw']],
-    // 'throwing_disc_backhand': ['throwing_disc_backhand',
-
-}
-
-const player_transitions = [
-    ['idle', {true: [keys.w], false: []}, 'jogging'],
-    ['idle', {true: [keys.s], false: []}, 'jog_backwards'],
-    ['idle', {true: [keys.w,keys.Lshift], false: []}, 'running'],
-    ['idle', {true: [keys.q], false: []}, 'dive_left'],
-    ['idle', {true: [keys.e], false: []}, 'dive_right'],
-    ['idle', {true: [keys.space], false: [keys.up,keys.Lshift]}, 'idle_vertical'],
-
-    ['idle', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
-    ['jogging', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
-    ['jog_backwards', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
-    ['running', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
-    ['dive_right', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
-    ['dive_left', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
-    ['idle_vertical', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
-    ['jogging_vertical', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
-
-    // ['idle', {true: [keys.space,keys.Lshift], false: [keys.up]}, 'throwing_disc_forehand'],
-
-    ['jogging', {true: [keys.w,keys.Lshift], false: []}, 'running'],
-    ['jogging', {true: [keys.w,keys.space], false: []}, 'jogging_vertical'],
-    ['jogging', {true: [], false: [keys.w]}, 'idle'],
-    ['jogging', {true: [keys.q], false: []}, 'dive_left'],
-    ['jogging', {true: [keys.e], false: []}, 'dive_right'],
-    ['jog_backwards', {true: [], false: [keys.s]}, 'idle'],
-
-    ['running', {true: [keys.w], false: [keys.Lshift]}, 'jogging'],
-    ['running', {true: [], false: [keys.w]}, 'idle'],
-    ['running', {true: [keys.q], false: []}, 'dive_left'],
-    ['running', {true: [keys.e], false: []}, 'dive_right'],
-    
-    // ['idle_vertical', {true: [], false: [keys.space]}, 'idle'],
-
-    ['idle', {true: [keys.h], false: [keys.up,keys.Lshift,keys.space]}, 'holding_disc_center'],
-    // ['holding_disc_center', {true: [keys.j], false: [keys.q,keys.e]}, 'idle'],
-    
-    ['holding_disc_center', {true: [keys.e], false: [keys.q]}, 'holding_disc_forehand'],
-    ['holding_disc_center', {true: [keys.q], false: [keys.e]}, 'holding_disc_backhand'],
-    
-    ['holding_disc_forehand', {true: [keys.w], false: [keys.q]}, 'holding_disc_center'],
-    ['holding_disc_forehand', {true: [keys.q], false: [keys.w]}, 'holding_disc_backhand'],
-
-    ['holding_disc_backhand', {true: [keys.e], false: [keys.w]}, 'holding_disc_forehand'],
-    ['holding_disc_backhand', {true: [keys.w], false: [keys.e]}, 'holding_disc_center'],
-
-    ['holding_disc_forehand', {true: [keys.throw_disc], false: []}, 'throwing_disc_forehand'],
-    ['throwing_disc_forehand', {true: [keys.threw_disc], false: []}, 'idle'],
-
-    ['holding_disc_backhand', {true: [keys.throw_disc], false: []}, 'throwing_disc_backhand'],
-    ['throwing_disc_backhand', {true: [keys.threw_disc], false: []}, 'idle'],
-
-
-    // ['throwing_disc_forehand', {true: [keys.throw_disc], false: []}, 'idle'],
-    // ['throwing_disc_backhand', {true: [keys.throw_disc], false: []}, 'idle'],
-    // ['holding_disc_center', {true: [keys.throw_disc], false: []}, 'idle'],
-
-
-]
-
-
-const velocity_handler = {
-    'idle': function(args){
-        let {cur_vel} = args;
-        return Math.max(0, cur_vel - 0.01);
-    },
-
-    'jogging': function(args){
-        let {cur_vel} = args;
-        return Math.min(0.3, cur_vel + 0.005)
-    },
-
-    'running': function(args){
-        let {cur_vel} = args;
-        return Math.min(0.6, cur_vel + 0.01)
-    },
-
-    'dive_left': function(args){
-        let {cur_vel, anim_time} = args;
-        if(anim_time < 0.4)
-            return Math.max(0,cur_vel - 0.02)
-        if(anim_time < 1)
-            return cur_vel;
-        
-        return Math.max(0, cur_vel - 0.01)
-    },
-
-    'dive_right': function(args){
-        let {cur_vel, anim_time} = args;
-        if(anim_time < 0.4)
-            return Math.max(0,cur_vel - 0.02)
-        if(anim_time < 1)
-            return cur_vel;
-        
-        return Math.max(0, cur_vel - 0.01)
-    },
-
-    'jogging_vertical': function(args){
-        let {cur_vel, anim_time} = args;
-        if(anim_time < 0.6)
-            // return Math.max(0,cur_vel - 0.007)
-            return 0.1
-
-        
-        return 0.3;
-    },
-
-    'holding_disc_center': function(args){
-        let {cur_vel} = args;
-        return Math.max(0, cur_vel - 0.05)
-    }, 
-
-    'jog_backwards': function(args){
-        let {cur_vel} = args;
-        return Math.max(-0.2, cur_vel - 0.005)
-    },    
-
-    
-
-    
-}
-
+// for(let k in key_bindings){
+//     bindings_gui.add(key_bindings, k)
+// }
 
 
 
@@ -1210,56 +1145,48 @@ var THROW = {
     AOT: 0
 }
 
-function updateThrowDetails(data){
-    if(data.direction != undefined){
-        THROW.direction = data.direction;
-    }
-    if(data.forward_speed != undefined){
-        THROW.forward_speed = data.forward_speed;
-    }
-    if(data.upward_speed != undefined){
-        THROW.upward_speed = data.upward_speed;
-    }
-    if(data.AOI != undefined){
-        THROW.AOI = data.AOI;
-    }
-    if(data.AOT != undefined){
-        THROW.AOT = data.AOT;
-    }
-}
 
 
 class DiscEntity {
-    constructor(model){
+    constructor(){
         
         // Model
+        asset_loaders['disc'] = 20;
 
-        this.mesh = model;
-        this.mesh.castShadow = true;
-        this.mesh.receiveShadow = true;
-        this.mesh.scale.set(0.005,0.005,0.005)
-        scene.add(this.mesh)
+        loadModel('disc1',(model) => {
 
-        // Flight params
+            this.mesh = model;
+            this.mesh.castShadow = true;
+            this.mesh.receiveShadow = true;
+            this.mesh.scale.set(0.005,0.005,0.005)
+            scene.add(this.mesh)
+    
+            // Flight params
+    
+            this.velocity = new Vector3();
+    
+            this.angle_of_incidence = 0;
+            this.angle_of_tilt = 0;
+    
+            this.spin_force = 1;
+    
+            this.throw_x = 0;
+            this.throw_z = 0;
+    
+            this.throw_side = 0;
+    
+            // State
+    
+            this.state = {
+                location: 'ground',
+                playerID: null
+            }
 
-        this.velocity = new Vector3();
+            asset_loaders['disc'] = 100;
 
-        this.angle_of_incidence = 0;
-        this.angle_of_tilt = 0;
+        })
 
-        this.spin_force = 1;
-
-        this.throw_x = 0;
-        this.throw_z = 0;
-
-        this.throw_side = 0;
-
-        // State
-
-        this.state = {
-            location: 'ground',
-            playerID: null
-        }
+        
     }
 
     update(t = 0.05){
@@ -1587,6 +1514,8 @@ class DiscEntity {
     }
 }
 
+
+
 var arcPoints = []
 
 var arcGeometry = new THREE.BufferGeometry().setFromPoints(arcPoints);
@@ -1594,28 +1523,12 @@ var arcLine = new THREE.Line(arcGeometry, new THREE.LineBasicMaterial())
 scene.add(arcLine)
 // arcLine.geometry.attributes.position.needsUpdate = true;
 
-var DISC;
 
-document.addEventListener('keydown', e => {
-    if(e.key == '1'){
-        PLAYER.animations['throw_disc_forehand'].play();
-    }
-    else if(e.key == 'p'){
-        let discscreen = screenXY(DISC.mesh.position, PLAYER.camera.camera)
-        // console.log('Mouse:',screenMouse.x,screenMouse.y)
-        // console.log('Disc:',discscreen.x,discscreen.y)
-    }
-    // else if(e.key == 'q'){
-    //     THROW.AOT += 0.1
-    // }
-    // else if(e.key == 'r'){
-    //     THROW.AOT -= 0.1
-    // }
-    else if(e.key=='0'){
-        // console.log('My player:',PLAYER_ID)
-        // console.log(PLAYERS)
-    }
-})
+// --------------------------------------------------------------
+var DISC = new DiscEntity();
+// --------------------------------------------------------------
+
+
 
 function computeArc(print=false){
     if(!print)console.log('PREPARE func call')
@@ -1663,16 +1576,6 @@ function computeArc(print=false){
     // // console.log('Angle:',ans * 180 / Math.PI)
 }
 
-document.addEventListener('keyup', e => {
-    if(e.key == '2'){
-        PLAYER.animations['throw_disc_forehand'].stop();
-    }
-})
-
-loadModel('disc1', function(model){
-    // model.scale.set(0.05,0.05,0.05);
-    DISC = new DiscEntity(model);
-})
 
 
 // Events
@@ -1775,56 +1678,32 @@ const tick = () =>
 
     counter = (counter+1)%100;
 
+    document.getElementById('users-value').innerHTML = Object.keys(PLAYERS).length;
 
-    // try{raycaster.setFromCamera( mouse, PLAYER.camera.camera );}
-    // catch(e){raycaster.setFromCamera( mouse, camera );}
 
-	// // calculate objects intersecting the picking ray
-	
-    // else onfield = false
+    document.getElementById('ass-value').innerHTML = ''
+    for(let asset in asset_loaders){
+        if(asset_loaders[asset] != 100) document.getElementById('ass-value').innerHTML += asset + ', '
+        else delete asset_loaders[asset];
+    }
 
-    // // console.log(delta)
-    // if (mixer) mixer.update(0.0005);
+
 
     // Render
     try{
-        PLAYER.mixer.update(delta)
-        PLAYER.update();
+        PLAYER.update(delta);
+        // PLAYER.mixer.update(delta)
+
+        // document.getElementById('rot-value').innerHTML = Math.round(PLAYER.entity.rotation.y * 100) / 100;
 
         for(let pID in PLAYERS){
             if(pID == PLAYER_ID) continue;
-            PLAYERS[pID].updateRemote()
-            PLAYERS[pID].mixer.update(delta)
+            PLAYERS[pID].updateRemote(delta)
+            // if(PLAYERS[pID].loading == false) PLAYERS[pID].mixer.update(delta)
         }
 
         DISC.update(delta * 3)
 
-        // if(PLAYER.throwingDisc()){
-        //     console.log('throwing')
-        // }
-
-        if(PLAYER.holdingDisc()){
-            if(!PLAYER.throwingDisc())
-                computeArc(true)
-        }
-        else{
-            scene.remove(arcLine)
-        }
-
-        if(PLAYER.state != 'dive_right' && PLAYER.state != 'dive_left'){
-
-            if(PLAYER.holdingDisc() && !PLAYER.throwingDisc()){
-                let look = DISC.mesh.position.clone();
-                PLAYER.camera.camera.lookAt(look.setY(5))
-            }
-            else{
-                let look = PLAYER.entity.position.clone();
-                let ylook = 5;
-                if(gazeMouse.y > 0.3) ylook = 5 - (gazeMouse.y - 0.3) * 5;
-                else if(gazeMouse.y < -0.3) ylook = 5 - (gazeMouse.y + 0.3) * 8
-                PLAYER.camera.camera.lookAt(look.setY(ylook))
-            }
-        }
         // console.log(gazeMouse.y)
 
 
@@ -1832,7 +1711,7 @@ const tick = () =>
 
         
     }
-    catch(e){}//console.log(e)}
+    catch(e){console.log(e)}
     // controls.update()
     try{renderer.render(scene, PLAYER.camera.camera)}
     catch(e){renderer.render(scene, camera)}
@@ -1873,8 +1752,6 @@ function screenXY(obj,camera){
 };
 
 
-
-
 // ------------------------------- SOCKET HANDLING -------------------------------------
 
 /*
@@ -1898,6 +1775,9 @@ function screenXY(obj,camera){
 */
 
 
+
+
+
 socket.on('init', data => {
     // data: {players, disc, id}
 
@@ -1907,10 +1787,15 @@ socket.on('init', data => {
 
     for(let pid in data.players){
         // data.players[pid]: {id, position, rotation, velocity}
-        PLAYERS[parseInt(pid)] = new CharacterController(parseInt(pid), false, data.players[pid].position, data.players[pid].rotation, data.players[pid].velocity );
+        asset_loaders['player'+String(pid)] = 0;
+        online_players.add(pid)
+        PLAYERS[parseInt(pid)] = new CharacterController(pid, 'shannon');
     }
 
-    PLAYERS[parseInt(data.id)] = new CharacterController(parseInt(data.id), true)
+    asset_loaders['player'+String(data.id)] = 0;
+    console.log('Creating controller...')
+    online_players.add(data.id)
+    PLAYERS[parseInt(data.id)] = new CharacterController(parseInt(data.id), 'shannon', true, 0)
     PLAYER = PLAYERS[data.id]
     socket.emit('newPlayer',{id:PLAYER_ID})
 
@@ -1923,40 +1808,44 @@ socket.on('init', data => {
 socket.on('newPlayer', data => {
     // data: {id}
     // console.log('SOCKET::new',data)
-    PLAYERS[data.id] = new CharacterController(parseInt(data.id))
-})
+    online_players.add(data.id)
+    asset_loaders['player'+String(data.id)] = 0;
+    PLAYERS[data.id] = new CharacterController(parseInt(data.id), 'shannon')
 
-socket.on('playerVelocity', data => {
-    // data: {id,velocity}
-    // // console.log('SOCKET::speed',data)
-    // // console.log(PLAYERS[data.id].id)
-    if(PLAYERS[parseInt(data.id)] == undefined) return;
-    PLAYERS[parseInt(data.id)].velocity = data.velocity;
-})
-
-socket.on('playerRotation', data => {
-    // data: {id,rotaiton}
-    // // console.log('SOCKET::rotate',data)
-    // // console.log(PLAYERS[data.id].id)
-    if(PLAYERS[parseInt(data.id)] == undefined) return;
-    PLAYERS[parseInt(data.id)].entity.rotation.y = data.rotation;
-})
-
-socket.on('playerState', data => {
-    // data: {id,state}
-    if(PLAYERS[parseInt(data.id)] == undefined) return;
-
-    PLAYERS[parseInt(data.id)].updateStateRemote(data.state);
+    // for(let pid in PLAYERS){
+    //     PLAYERS[pid].camera.addMiniPlayer(data.id);
+    // }
 })
 
 socket.on('playerPosition', data => {
     // data: {id,pos}
+    // console.log('Socket::position')
+    if(PLAYERS[data.id] != undefined && PLAYERS[data.id].loading == false){
+        setVector(PLAYERS[data.id].entity.position, data.position)
+    }
+})
 
-    // // console.log('Socket::player position changed:',data)
+socket.on('playerRotation', data => {
+    // data: {id,rot}
+    // console.log('Socket::rotation')
+        if(PLAYERS[data.id] != undefined && PLAYERS[data.id].loading == false){
+        PLAYERS[data.id].entity.rotation.y = data.rotation
+    }
+})
+socket.on('playerVelocity', data => {
+    // console.log('Socket::velocity',data.velocity)
+    // data: {id,vel}
+    if(PLAYERS[data.id] != undefined && PLAYERS[data.id].loading == false){
+        PLAYERS[data.id].velocity[0] = parseFloat(data.velocity[0])
+        PLAYERS[data.id].velocity[1] = parseFloat(data.velocity[1])
+    }
+})
 
-    if(PLAYERS[parseInt(data.id)] == undefined) return;
-
-    setVector(PLAYERS[parseInt(data.id)].entity.position, data.position)
+socket.on('playerState', data => {
+    // data: {id,state}
+    if(PLAYERS[data.id] != undefined && PLAYERS[data.id].loading == false){
+        PLAYERS[data.id].updateStateRemote(data.state)
+    }
 })
 
 
@@ -1986,6 +1875,10 @@ socket.on('throw', data => {
 socket.on('removePlayer', data => {
     // data: {id}
     if(PLAYERS[parseInt(data.id)] == undefined) return;
+    online_players.delete(data.id);
+    // for(let pid in PLAYERS){
+    //     PLAYERS[pid].camera.removeMiniPlayer(data.id);
+    // }
     scene.remove(PLAYERS[data.id].entity);
     delete PLAYERS[data.id];
 
@@ -1998,6 +1891,8 @@ socket.on('removePlayer', data => {
 
 setInterval(()=>{
     socket.emit('ping',{start: new Date().getTime()})
+    if(PLAYER != undefined && !PLAYER.loading)
+        PLAYER.broadcast();
 }, 2000)
 
 socket.on('ping', data => {
@@ -2007,16 +1902,16 @@ socket.on('ping', data => {
 })
 
 
-document.addEventListener('keydown',e=>{
-    if(e.key == '`'){
-        if(PLAYER.entity != undefined && PLAYER_ID != undefined)
-            socket.emit('playerPosition',{id:PLAYER_ID,position:PLAYER.entity.position})
-    }
-    else if(e.key == 'p'){
-        let d = new Date().getTime();
-        socket.emit('ping',{start:d});
-    }
-})
+// document.addEventListener('keydown',e=>{
+//     if(e.key == '`'){
+//         if(PLAYER.entity != undefined && PLAYER_ID != undefined)
+//             socket.emit('playerPosition',{id:PLAYER_ID,position:PLAYER.entity.position})
+//     }
+//     else if(e.key == 'p'){
+//         let d = new Date().getTime();
+//         socket.emit('ping',{start:d});
+//     }
+// })
 
 window.addEventListener('wheel', e => {
     // // console.log(e)
@@ -2029,13 +1924,3 @@ window.addEventListener('wheel', e => {
             THROW.AOT = Math.min(Math.PI/3,THROW.AOT + 0.2)
     }
 })
-
-
-function updatePlayerPosition(pos){
-    socket.emit('playerPosition',{id:PLAYER_ID,position:pos})
-}
-
-setInterval(()=>{
-    if(PLAYER.entity != undefined && PLAYER_ID != undefined)
-            socket.emit('playerPosition',{id:PLAYER_ID,position:PLAYER.entity.position})
-},2000)
