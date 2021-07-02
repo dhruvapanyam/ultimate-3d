@@ -17,6 +17,14 @@ import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js'
 
 import {keys, player_states, player_transitions, velocity_handler, side_velocity_handler, player_animations} from './state_manager'
 
+import {addobj, returnobj} from './test1';
+import {show} from './test2'
+
+document.addEventListener('keydown',e=>{
+    if(e.key == '4') console.log(returnobj())
+    else if(e.key == '5') addobj();
+})
+
 
 const sin = Math.sin;
 const cos = Math.cos;
@@ -333,8 +341,8 @@ class ThirdPersonCamera {
 
 
 
-    update(obj){
-        let ang = obj.rotation.y;
+    update(blah){
+        let ang = this.controller.rotation.y;
 
         let dist_from_player = 30;
 
@@ -342,7 +350,7 @@ class ThirdPersonCamera {
 
         let rot = ang + this.angle_offset
 
-        if(PLAYER.state == 'turning_back'){
+        if(this.controller.state == 'turning_back'){
             let anim_elapsed = this.controller.animations['turn_back'].time;
             rot -= Math.PI * anim_elapsed/0.6
         }
@@ -1449,7 +1457,7 @@ class DiscEntity {
 
         let angle = THROW.direction;
         let y_force = THROW.upward_speed;
-        let speed = THROW.forward_speed;
+        let speed = THROW.forward_speed * 2/3 + 10;
         this.angle_of_incidence = THROW.AOI;
         this.angle_of_tilt = THROW.AOT;
 
@@ -1711,7 +1719,7 @@ const tick = () =>
 
         
     }
-    catch(e){console.log(e)}
+    catch(e){}//console.log(e)}
     // controls.update()
     try{renderer.render(scene, PLAYER.camera.camera)}
     catch(e){renderer.render(scene, camera)}
