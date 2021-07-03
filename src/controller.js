@@ -50,6 +50,11 @@ class CharacterController {
         if(this.loading) return new Vector3();
         return this.entity.position
     }
+    getBonePosition(){
+        if(this.loading) return new Vector3();
+        return this.center_bone.getWorldPosition();
+    }
+
 
     loadAssets(){
         if(MODELS[this.character] != undefined){

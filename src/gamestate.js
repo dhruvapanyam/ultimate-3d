@@ -2,7 +2,7 @@ import {CharacterController} from './controller'
 import {DiscEntity} from './disc'
 import {Vector3} from 'three'
 
-import {BroadcastCamera} from './camera';
+import {BroadcastCamera, ThirdPersonCamera} from './camera';
 
 import {MiniMap} from './HUD';
 
@@ -39,7 +39,8 @@ class GameState {
             direction: 0
         }
 
-        this.cam = new BroadcastCamera(new Vector3(-110,60,0), new Vector3(-50,0,0), this.scene)
+        // this.cam = new BroadcastCamera(new Vector3(-110,60,0), new Vector3(-50,0,0), this.scene)
+        this.cam = new ThirdPersonCamera(this.scene);
 
 
         this.field_dimensions = field_dimensions
@@ -108,7 +109,11 @@ class GameState {
 
     updateCamera(){
         if(this.player_id == null) return;
-        this.cam.update(this.players[this.player_id].getPosition());
+        // this.cam.update(this.players[this.player_id].getPosition());
+        if(this.disc.state.playerID == this.player_id)
+            this.cam.update(this.player_state.rotation, this.disc.getPosition(), true);
+        else
+            this.cam.update(this.player_state.rotation, this.players[this.player_id].getPosition());
     }
 
     updateHUD(){
