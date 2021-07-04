@@ -21,6 +21,8 @@ class DiscEntity {
 
         loadModel('disc1',(model) => {
 
+            // console.log('LoadModel::callback (disc)')
+            // console.log('Received model:',model)
             this.mesh = model;
             this.mesh.castShadow = true;
             this.mesh.receiveShadow = true;
@@ -138,7 +140,7 @@ class DiscEntity {
                     break;
                 
                 case 3:
-                    // console.log('3')
+                    // // console.log('3')
                     f1 = W * sin(AOI + AOM);
                     h = W * cos(AOI + AOM);
                     f2 = C1 * h;
@@ -146,7 +148,7 @@ class DiscEntity {
                     break;
                 
                 case 4:
-                    // console.log('4')
+                    // // console.log('4')
                     f1 = W * sin(Math.PI - (AOI + AOM));
                     h = W * cos(Math.PI - (AOI + AOM));
                     f2 = C1 * h;
@@ -166,11 +168,11 @@ class DiscEntity {
             let drag = d1 + d2;
 
             // if(flight_case == 3) {
-            //     // console.log('3')
+            //     // // console.log('3')
             //     lift *= 4;
             // }
 
-            // console.log(flight_case)
+            // // console.log(flight_case)
 
 
             let P = new Vector3(); // new position
@@ -196,7 +198,7 @@ class DiscEntity {
             let s = (v.y * t) + (t*t*F/2)
 
                 // v^2 = 2Fs + u^2
-            // console.log(s)
+            // // console.log(s)
             if(s < 0.1){
                 let factor = this.OI() ? 0.3 : 1
                 if(Math.abs(this.angle_of_tilt) > Math.PI/5){
@@ -226,7 +228,7 @@ class DiscEntity {
                     }
                 }
                 else{
-                    // console.log('blade')
+                    // // console.log('blade')
                     if(V.y < -15)
                     {
                         V.y = -15
@@ -236,9 +238,9 @@ class DiscEntity {
             }
 
             if(V.x == 0 && V.z == 0){
-                // // console.log('Became Zero!')
+                // // // console.log('Became Zero!')
             }
-            // // console.log(V.y)
+            // // // console.log(V.y)
             this.velocity = V
             // this.velocity.y = V.y
 
@@ -251,8 +253,8 @@ class DiscEntity {
             P.y = (p.y + (V.y * t));
             P.z = (p.z + (V.z * t) + this.throw_side * t * side_z_comp);
 
-            // // console.log('old position:',p.x,p.y,p.z)
-            // // console.log('new position:',P.x,P.y,P.z)
+            // // // console.log('old position:',p.x,p.y,p.z)
+            // // // console.log('new position:',P.x,P.y,P.z)
 
             this.mesh.position.x = P.x
             this.mesh.position.y = P.y
@@ -264,7 +266,7 @@ class DiscEntity {
             else{
                 look_vector.set(-this.throw_x, 1/Math.tan(AOI), -this.throw_z);
             } 
-            // // console.log('looking at:',look_vector.x,look_vector.y,look_vector.z);
+            // // // console.log('looking at:',look_vector.x,look_vector.y,look_vector.z);
             look_vector.x += this.mesh.position.x
             look_vector.y += this.mesh.position.y
             look_vector.z += this.mesh.position.z
@@ -273,7 +275,7 @@ class DiscEntity {
 
             // change lookvactor's X-Z values by moving them to the side
             let side_look = Math.tan(AOT);
-            // if(AOT == 0) console.log('up')
+            // if(AOT == 0) // console.log('up')
             look_vector.x += side_look * side_x_comp
             look_vector.z += side_look * side_z_comp
 
@@ -301,9 +303,9 @@ class DiscEntity {
     }
 
     throw(THROW){
-        // // console.log('throwing')
+        // // // console.log('throwing')
 
-        console.log('Throwing disc:',THROW)
+        // console.log('Throwing disc:',THROW)
         
 
         this.spin = THROW.spin;
@@ -342,7 +344,7 @@ class DiscEntity {
         //     disc_flight_params.throw_direction_z = this.throw_z;
         // }
 
-        // // console.log('throwing to:',this.throw_x,this.throw_z)
+        // // // console.log('throwing to:',this.throw_x,this.throw_z)
 
 
         this.throw_side = 0;
@@ -353,16 +355,16 @@ class DiscEntity {
     // getArc(){
     //     let ang = -PLAYER.entity.rotation.y + Math.PI/2;
         
-    //     // // console.log('Init angle:',ang)
+    //     // // // console.log('Init angle:',ang)
 
     //     let res = {}
     //     let i=0;
     //     arcPoints = [];
     //     for(let t = ang - 5*Math.PI/12; t <= ang + 5*Math.PI/12; t += Math.PI/48){
-    //         // // console.log('computing for angle:',(t-ang)*180/Math.PI)
+    //         // // // console.log('computing for angle:',(t-ang)*180/Math.PI)
     //         let v = new Vector2(cos(t),sin(t)).multiplyScalar(10);
     //         let v3 = new Vector3(v.x,0,v.y).add(this.mesh.position.clone().setY(3))//(PLAYERS[this.state.playerID].center_bone.getWorldPosition(new Vector3()));
-    //         // // console.log(v3)
+    //         // // // console.log(v3)
     //         res[t] = screenXY(v3,PLAYER.camera.camera)
 
     //         arcPoints[i] = v3;

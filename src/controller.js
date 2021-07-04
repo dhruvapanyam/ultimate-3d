@@ -2,7 +2,8 @@
 import './style.css'
 import * as THREE from 'three'
 import { AnimationMixer, Vector2, Vector3 } from 'three'
-import {init_assets, MODELS, ANIMATIONS} from './loaders'
+import {loadModel, loadAnimation} from './loaders'
+import {player_animations} from './state_manager'
 
 
 
@@ -42,12 +43,16 @@ class CharacterController {
         this.character = character;
         this.velocity = [0,0];
         this.loading = true;
+        this.loading_model = true;
+        this.loading_animations = true;
         this.control = control;
         // this.input = input;
 
         this.scene = scene;
 
         this.throwing = false;
+
+        this.loadAssets();
     }
 
     getPosition(){
@@ -67,13 +72,13 @@ class CharacterController {
 
 
     loadAssets(){
-        if(MODELS[this.character] != undefined){
+        loadModel('shannon', (model) => {
 
-            console.log('Loading assets for player',this.id)
+            // console.log('LoadModel::callback')
+            // console.log('Received model:',model)
+            // console.log('Loading assets for player',this.id)
 
-            this.entity = MODELS[this.character]
-            delete MODELS[this.character];
-            init_assets(this.character)
+            this.entity = model;
             // this.entity.scale.set(0.0025,0.0025,0.0025)
 
             this.bones = {};
@@ -92,13 +97,6 @@ class CharacterController {
 
             }
 
-            console.log(this.entity)
-
-            // console.log(this.entity.children[characters[this.character].bone])
-            // console.log(this.neck, this.bones['mixamorig1Neck'].getObjectById(this.neck))
-            // console.log(uuid, this.scene.getObjectById(uuid))
-
-            // this.center_bone = this.bones[characters[this.character].rig];
             this.center_bone = this.bones['mixamorig1Hips'];
 
             // this.mixer = new THREE.AnimationMixer(this.entity.children[characters[this.character].bone])
@@ -106,7 +104,7 @@ class CharacterController {
             this.scene.add(this.entity)
             this.animations = {}
 
-            // console.log('Controllable Player?',control)
+            // // console.log('Controllable Player?',control)
             if(this.control == true){
                 // this.camera = new ThirdPersonCamera(this);
                 this.input = new CharacterControllerInput()
@@ -118,14 +116,14 @@ class CharacterController {
                     this.FSM[preset] = new FiniteStateMachine(this, player_states)
                     for(let trans of player_transitions[preset]){
                         let [prev, req, next] = trans;
-                        // // console.log('Prev:',prev,'Req:',req,'Next:',next)
+                        // // // console.log('Prev:',prev,'Req:',req,'Next:',next)
                         this.addTransition(preset, prev, req, next)
                     }
                     
                 }
 
                 this.entity.remove(this.entity.children[characters[this.character].hair])
-                // console.log(this.entity)
+                // // console.log(this.entity)
             
             }
             else{
@@ -134,27 +132,39 @@ class CharacterController {
 
 
             this.state = 'idle'
-            // this.velocity = velocity;
 
-            // setVector(this.entity.position,position)
-            // this.entity.rotation.y = rotation
-
-            for(let clipname in ANIMATIONS){
-                this.addAnimation(clipname, ANIMATIONS[clipname]);
+            this.loading_model = false;
+            if(!this.loading_model && !this.loading_animations) {
+                this.loading = false;
+                this.setupAnimations();
             }
-            // asset_loaders['player'+String(this.id)] = 100;
 
-            this.loading = false;
+        })
 
-            // setInterval(()=>{
-            //     this.broadcast()
-            // },2000)
+
+        loadAnimation(player_animations, (anims) => {
+
+            // console.log('LoadAnimation::callback. Received animations:',anims)
+            this.temp_anims = {}
+            for(let clipname in anims){
+                this.temp_anims[clipname] = anims[clipname]
+            }
+
+            this.loading_animations = false;
+            if(!this.loading_model && !this.loading_animations) {
+                this.loading = false;
+                this.setupAnimations()
+            }
+
+        })
+        
+
+    }
+
+    setupAnimations(){
+        for(let anim in this.temp_anims){
+            this.addAnimation(anim, this.temp_anims[anim])
         }
-
-        else{
-            // console.log('Waiting for assets')
-        }
-
     }
 
     addAnimation(path,anim){
@@ -163,12 +173,12 @@ class CharacterController {
         if(path == intro) this.animations[path].play();
 
 
-        // // console.log(this)
+        // // // console.log(this)
     }
 
 
     addTransition(preset, prev, req, next, options={}){
-        // // console.log('CharacterController::addTransition: calling inner functions');
+        // // // console.log('CharacterController::addTransition: calling inner functions');
         this.FSM[preset].addTransition(prev, req, next, options)
     }
 
@@ -232,9 +242,9 @@ class CharacterController {
             // socket.emit('playerState',{id:PLAYER_ID, state:next});
     
 
-            console.log(new_state.prev,'to',new_state.next)
+            // console.log(new_state.prev,'to',new_state.next)
 
-            // // console.log('CharacterController::processInput: Transitioning from',prev,'to',next,'! Options:',options);
+            // // // console.log('CharacterController::processInput: Transitioning from',prev,'to',next,'! Options:',options);
 
             if(new_state.next == 'jogging_vertical') this.animations[next].time = 0.35;
             else this.animations[next].time = 0.0;
@@ -266,7 +276,7 @@ class CharacterController {
             // this.animations[prev].stop()
             
             
-            // // console.log('Playing animation:',next)
+            // // // console.log('Playing animation:',next)
 
             
 
@@ -298,12 +308,12 @@ class CharacterController {
             new_vel[1] = side_velocity_handler[this.state](options);
         }
 
-        // console.log(this.velocity[0] - new_vel[0]);
-        // console.log(this.velocity)
+        // // console.log(this.velocity[0] - new_vel[0]);
+        // // console.log(this.velocity)
 
         if(new_vel[0] != this.velocity[0] || new_vel[1] != this.velocity[1]){
             this.velocity = new_vel;
-            // console.log('new velocity:',new_vel)
+            // // console.log('new velocity:',new_vel)
             // this.updatePlayerVelocity(true)
         }
 
@@ -338,10 +348,7 @@ class CharacterController {
 
     update(delta, hasDisc=false){
 
-        if(this.loading){
-            this.loadAssets()
-            return {};
-        }
+        if(this.loading == true) return {};
 
         this.mixer.update(delta)
         // this.camera.update(this.entity)
@@ -360,14 +367,11 @@ class CharacterController {
     }
 
     updateRemote(delta){
-        if(this.loading){
-            this.loadAssets()
-            return;
-        }
+        if(this.loading == true) return;
 
         this.mixer.update(delta)
 
-        // console.log(this.velocity)
+        // // console.log(this.velocity)
 
         let transZ = delta * this.velocity[0]
         let transX = delta * this.velocity[1]
@@ -405,13 +409,13 @@ class CharacterControllerInput {
     constructor(){
         // this.controller = controller
         this.keys = {}
-        console.log('input controller')
+        // console.log('input controller')
         // let inp_keys = ['KeyQ','KeyW','KeyE','KeyR','KeyA','KeyC','KeyS','KeyD','KeyH','KeyJ','Space','ShiftLeft','ShiftRight','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','catch_disc','throw_disc','threw_disc']
         // let inp_keys = ['q','w','e','a','s','d','h','j',' ','shift','arrowup','arrowdown','arrowleft','arrowright']
         for(let inp in keys) this.keys[keys[inp]] = false;
 
         window.addEventListener('keydown',(e)=>{
-            // console.log('keydown')
+            // // console.log('keydown')
             let k = e.code//.toLowerCase()
             if(this.keys[k] != undefined){
                 this.keys[k] = true;
@@ -430,7 +434,7 @@ class CharacterControllerInput {
 class FiniteStateMachine {
     constructor(controller, states){
         this.controller = controller
-        // console.log('Init FSM: Controller =>',this.controller)
+        // // console.log('Init FSM: Controller =>',this.controller)
         this.currentState = 'idle'
 
         // this.special_rules = {'vertical': [{function_check: x => (x.time > 2.2), state: 'idle'}]}
@@ -440,7 +444,7 @@ class FiniteStateMachine {
             this.states[s] = new FSMState(s,states[s])
         }
 
-        // console.log('FSM: States =>',this.states)
+        // // console.log('FSM: States =>',this.states)
     }
 
     satisfiesRequirements(inp, inp_key) {
@@ -462,7 +466,7 @@ class FiniteStateMachine {
         // req: {true:['w','shift', ...], false:[' ','d', ...]}
         let true_set = new Set(req.true)
         let false_set = new Set(req.false)
-        // // // console.log('FSM::checkCollision: inp_key =',inp_key)
+        // // // // console.log('FSM::checkCollision: inp_key =',inp_key)
         inp_key = JSON.parse(inp_key);
         for(let t of inp_key.true){
             if(true_set.has(t) == false) return false;
@@ -476,16 +480,16 @@ class FiniteStateMachine {
     }
 
     addTransition(prev, req, next, options){
-        // // // console.log('FSM::addTransition: entered function. Params:',prev,req,next,options);
+        // // // // console.log('FSM::addTransition: entered function. Params:',prev,req,next,options);
         for(let inp_key in this.states[prev].transitions){
-            // // // console.log('Checking collision with',inp_key)
+            // // // // console.log('Checking collision with',inp_key)
             if(this.checkCollision(req, inp_key))
             {
-                // // console.log('This transition:',prev,req,next,'is comparable to another transition')
+                // // // console.log('This transition:',prev,req,next,'is comparable to another transition')
                 return null;
             }
         }
-        // // console.log('FSM::addTransition: adding transition',req,next);
+        // // // console.log('FSM::addTransition: adding transition',req,next);
         this.states[prev].addTransition(req, next, options);
     }
 
@@ -497,13 +501,13 @@ class FiniteStateMachine {
         let time_to_throw = false;
 
         let inp_key = null;
-        // // console.log('current state:',this.currentState)
+        // // // console.log('current state:',this.currentState)
         let timeout = this.states[this.currentState].timeout;
         if(timeout != null) {
             let anim = this.states[this.currentState].animation
 
             if (this.controller.animations[anim].time > timeout[0]){
-                // console.log('Timeout transition! ==>', timeout[1])
+                // // console.log('Timeout transition! ==>', timeout[1])
                 if(0 && timeout[1] == 'throw'){
                     if(DISC.state.playerID == PLAYER_ID)
                         time_to_throw = true;
@@ -524,13 +528,13 @@ class FiniteStateMachine {
 
         if(time_to_throw == true) return 'throw';
 
-        // // // console.log('FSM::updateState: current state\'s transitions:',this.states[this.currentState])
+        // // // // console.log('FSM::updateState: current state\'s transitions:',this.states[this.currentState])
         for(let k in this.states[this.currentState].transitions){
-            // // // console.log('transition key:',k)
+            // // // // console.log('transition key:',k)
             if(this.satisfiesRequirements(inp, k)){
-                // console.log('FSM::updateState: found inp_key match with',k)//this.states[this.currentState].transitions[k]);
+                // // console.log('FSM::updateState: found inp_key match with',k)//this.states[this.currentState].transitions[k]);
                 inp_key = k;
-                // // console.log('Updating inp_key to',inp_key)
+                // // // console.log('Updating inp_key to',inp_key)
                 break
             }
         }
@@ -538,7 +542,7 @@ class FiniteStateMachine {
 
         if(inp_key == null) return null;
 
-        // // // console.log('reached here')
+        // // // // console.log('reached here')
 
         let next_state = this.states[this.currentState].transitions[inp_key]
         let prev_state = this.currentState
@@ -550,7 +554,7 @@ class FiniteStateMachine {
             options: next_state.options
         }
 
-        // // // console.log('FSM::updateState: Returning:',res)
+        // // // // console.log('FSM::updateState: Returning:',res)
 
         return res;
 
@@ -590,7 +594,7 @@ class FSMState {
             state: next,
             options: opt
         };
-        // // console.log('FSMState::addTransition: added transition:', this.transitions[inp_key]);
+        // // // console.log('FSMState::addTransition: added transition:', this.transitions[inp_key]);
 
     }
 

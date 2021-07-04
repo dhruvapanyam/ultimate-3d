@@ -89,6 +89,7 @@ class GameState {
     }
 
     updateDisc(delta){
+        if(this.disc == undefined) return;
         if(this.disc.loading == true) return;
         if(this.disc.state.playerID == null){
             if(this.disc.state.location == 'air'){
@@ -309,7 +310,7 @@ class GameState {
     }
 
     holdingDisc(){
-        return this.player_id != null && this.disc.state.playerID == this.player_id 
+        return this.disc != undefined && this.disc.state != undefined && this.player_id != null && this.disc.state.playerID == this.player_id 
     }
 
 
