@@ -380,6 +380,7 @@ class CharacterController {
     }
 
     updateStateRemote(state){
+        if(this.loading == true) return;
         // state: {state,current_anim,velocity}
         this.velocity[0] = state.velocity[0]
         this.velocity[1] = state.velocity[1]
