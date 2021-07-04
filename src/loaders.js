@@ -1,5 +1,7 @@
+import { CompressedPixelFormat } from 'three'
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import localforage from 'localforage'
 const fbxLoader = new FBXLoader()
 const gltfLoader = new GLTFLoader()
 
@@ -22,32 +24,37 @@ loadAnimation(player_animations, anims=>{for(let a in anims) ANIMATIONS[a] = ani
 
 
 
-function loadModel(model_path, callback){
-    if(0 && model_path == 'shannon'){
-        gltfLoader.load(
-            './models/'+model_path+'.gltf',
-            function(obj){
-                console.log(model_path,obj)
-                console.log('loadModel')
-                obj.scale.set(0.05,0.05,0.05)
-                obj.traverse(node=>{if(node.isMesh){node.castShadow=true;node.receiveShadow=true;}})
-                callback(obj)
-            }
-        )
+function loadModel(model_path, callback) {
+    const file = `/models/${model_path}.fbx`;
+
+    const onLoad = (obj) => {
+        // console.log(model_path,obj)
+        console.log('loadModel')
+        obj.scale.set(0.05,0.05,0.05)
+        obj.traverse(node=>{if(node.isMesh){node.castShadow=true;node.receiveShadow=true;}})
+        callback(obj)
     }
-    else{
-        console.log('loading fbx:',model_path)
-        fbxLoader.load(
-            './models/'+model_path+'.fbx',
-            function(obj){
-                // console.log(model_path,obj)
-                console.log('loadModel')
-                obj.scale.set(0.05,0.05,0.05)
-                obj.traverse(node=>{if(node.isMesh){node.castShadow=true;node.receiveShadow=true;}})
-                callback(obj)
-            }
-        )
-    }
+    
+    const path = '/models'
+    if(localStorage.getItem(file + 'temp') === null) {
+        fetch(file)
+        .then(res => res.arrayBuffer())
+        .then(async res => {
+            localStorage.setItem(file + 'temp', 'yay');
+            localforage.setItem(file, res)
+            onLoad(fbxLoader.parse(res, path));
+        })
+        .catch(err => {
+            console.log(err);
+        })
+    } else {
+        localforage.getItem(file)
+            .then(res => {
+                console.log(res);
+                onLoad(fbxLoader.parse(res, path));
+            })        
+        console.log("hello");
+    }                
 }
 
 function loadAnimation(anim_set, callback){

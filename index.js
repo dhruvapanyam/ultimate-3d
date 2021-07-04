@@ -12,9 +12,21 @@ const io = socketIo(server, {
         origin: '*',
     }
 });
- 
-if(process.env.NODE_ENV === 'production')
-    app.use(express.static(path.join(__dirname, 'dist')));
+
+function setHeaders (res, path) {
+    const splits = path.split('/');
+    const fileName = splits[splits.length - 1];
+    console.log(fileName);
+    if(fileName === 'shannon.fbx')
+        res.setHeader('Cache-Control', 'public, max-age=31536000')
+    
+}
+
+if(process.env.NODE_ENV === 'production') {    
+    app.use(express.static(path.join(__dirname, 'dist'), {
+        'setHeaders': setHeaders
+    }));
+}
 
  
 app.use(cors());
