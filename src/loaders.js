@@ -38,22 +38,22 @@ function loadModelFBX(model_path, onLoad) {
             onLoad(fbxLoader.parse(res, path));
         })
         .catch(err => {
-            console.log(err);
+            // console.log(err);
         })
     } else {
         localforage.getItem(file)
             .then(res => {
-                console.log(res);
+                // console.log(res);
                 onLoad(fbxLoader.parse(res, path));
             })        
-        console.log("hello");
+        // console.log("hello");
     }                
 }
 
 function loadModel(model_path, callback){
     const onLoad = (obj) => {
-        // console.log(model_path,obj)
-        console.log('loadModel::onLoad. Received:',obj)
+        // // console.log(model_path,obj)
+        // console.log('loadModel::onLoad. Received:',obj)
         obj.scale.set(0.05,0.05,0.05)
         obj.traverse(node=>{if(node.isMesh){node.castShadow=true;node.receiveShadow=true;}})
         callback(obj)
@@ -64,12 +64,12 @@ function loadModel(model_path, callback){
 
 function loadAnimation(anim_set, callback){
     const onLoad = (obj) => {
-        console.log('loadAnimation::onLoad. Received:',obj)
+        // console.log('loadAnimation::onLoad. Received:',obj)
         let anims = {}
         for(let clip of obj.animations){
             let cname = clip.name.split('Armature|')[1];
             if(anim_set.has(cname)){
-                // console.log('Extracting animations clip:',cname,clip)
+                // // console.log('Extracting animations clip:',cname,clip)
                 anims[cname] = clip;
             }
         }
