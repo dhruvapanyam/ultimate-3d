@@ -56,6 +56,29 @@ const keys = {
     d5: 'Digit5',
 }
 
+const rotation_handler = {
+    'pov':{
+        'cutter':{
+            left: keys.left,
+            right: keys.right
+        },
+        'thrower':{
+            left: keys.a,
+            right: keys.d
+        },
+    },
+    'broadcast':{
+        'cutter':{
+            left: keys.left,
+            right: keys.right
+        },
+        'thrower':{
+            left: keys.a,
+            right: keys.d
+        },
+    }
+}
+
 
 
 const player_states = {
@@ -79,8 +102,8 @@ const player_states = {
     'holding_disc_center': [_hold_center, null],
     'holding_disc_forehand': [_hold_fore, null],
     'holding_disc_backhand': [_hold_back, null],
-    'throwing_disc_forehand': [_throw_fore, [0.8, 'throw']],
-    'throwing_disc_backhand': [_throw_back, [1, 'throw']],
+    'throwing_disc_forehand': [_throw_fore, [1, 'holding_disc_forehand']],
+    'throwing_disc_backhand': [_throw_back, [1.2, 'holding_disc_backhand']],
     // 'throwing_disc_backhand': ['throwing_disc_backhand',
 
 }
@@ -88,67 +111,132 @@ const player_states = {
 const player_animations = new Set();
 for(let s in player_states) player_animations.add(player_states[s][0])
 
-const player_transitions = [
-    ['idle', {true: [keys.d2], false: []}, 'idle_defence'],
-    ['idle_defence', {true: [keys.d1], false: []}, 'idle'],
-    ['idle', {true: [keys.w], false: []}, 'jogging'],
-    ['idle', {true: [keys.s], false: []}, 'jog_backwards'],
-    ['idle', {true: [keys.w,keys.Lshift], false: []}, 'running'],
-    ['idle', {true: [keys.q], false: []}, 'dive_left'],
-    ['idle', {true: [keys.e], false: []}, 'dive_right'],
-    ['idle', {true: [keys.space], false: [keys.up,keys.Lshift]}, 'idle_vertical'],
+const player_transitions = {
+    'pov': [
+        ['idle', {true: [keys.d2], false: []}, 'idle_defence'],
+        ['idle_defence', {true: [keys.d1], false: []}, 'idle'],
+        ['idle', {true: [keys.up], false: []}, 'jogging'],
+        ['idle', {true: [keys.down], false: []}, 'jog_backwards'],
+        ['idle', {true: [keys.up,keys.Lshift], false: []}, 'running'],
+        ['idle', {true: [keys.q], false: []}, 'dive_left'],
+        ['idle', {true: [keys.e], false: []}, 'dive_right'],
+        ['idle', {true: [keys.space], false: [keys.up,keys.Lshift]}, 'idle_vertical'],
 
-    ['idle', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
-    ['jogging', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
-    ['jog_backwards', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
-    ['running', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
-    ['running', {true: [keys.r], false: []}, 'turning_back'],
-    ['dive_right', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
-    ['dive_left', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
-    ['idle_vertical', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
-    ['jogging_vertical', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
+        ['idle', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
+        ['jogging', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
+        ['jog_backwards', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
+        ['running', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
+        ['running', {true: [keys.r], false: []}, 'turning_back'],
+        ['dive_right', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
+        ['dive_left', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
+        ['idle_vertical', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
+        ['jogging_vertical', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
 
-    // ['idle', {true: [keys.space,keys.Lshift], false: [keys.up]}, 'throwing_disc_forehand'],
+        // ['idle', {true: [keys.space,keys.Lshift], false: [keys.up]}, 'throwing_disc_forehand'],
 
-    ['jogging', {true: [keys.w,keys.Lshift], false: []}, 'running'],
-    ['jogging', {true: [keys.w,keys.space], false: []}, 'jogging_vertical'],
-    ['jogging', {true: [], false: [keys.w]}, 'idle'],
-    ['jogging', {true: [keys.q], false: []}, 'dive_left'],
-    ['jogging', {true: [keys.e], false: []}, 'dive_right'],
-    ['jog_backwards', {true: [], false: [keys.s]}, 'idle'],
+        ['jogging', {true: [keys.up,keys.Lshift], false: []}, 'running'],
+        ['jogging', {true: [keys.up,keys.space], false: []}, 'jogging_vertical'],
+        ['jogging', {true: [], false: [keys.up]}, 'idle'],
+        ['jogging', {true: [keys.q], false: []}, 'dive_left'],
+        ['jogging', {true: [keys.e], false: []}, 'dive_right'],
+        ['jog_backwards', {true: [], false: [keys.down]}, 'idle'],
 
-    ['running', {true: [keys.w], false: [keys.Lshift]}, 'jogging'],
-    ['running', {true: [], false: [keys.w]}, 'idle'],
-    ['running', {true: [keys.q], false: []}, 'dive_left'],
-    ['running', {true: [keys.e], false: []}, 'dive_right'],
-    
-    // ['idle_vertical', {true: [], false: [keys.space]}, 'idle'],
+        ['running', {true: [keys.up], false: [keys.Lshift]}, 'jogging'],
+        ['running', {true: [], false: [keys.up]}, 'idle'],
+        ['running', {true: [keys.q], false: []}, 'dive_left'],
+        ['running', {true: [keys.e], false: []}, 'dive_right'],
+        
+        // ['idle_vertical', {true: [], false: [keys.space]}, 'idle'],
 
-    ['idle', {true: [keys.h], false: [keys.up,keys.Lshift,keys.space]}, 'holding_disc_center'],
-    // ['holding_disc_center', {true: [keys.j], false: [keys.q,keys.e]}, 'idle'],
-    
-    ['holding_disc_center', {true: [keys.e], false: [keys.q]}, 'holding_disc_forehand'],
-    ['holding_disc_center', {true: [keys.q], false: [keys.e]}, 'holding_disc_backhand'],
-    
-    ['holding_disc_forehand', {true: [keys.w], false: [keys.q]}, 'holding_disc_center'],
-    ['holding_disc_forehand', {true: [keys.q], false: [keys.w]}, 'holding_disc_backhand'],
+        ['idle', {true: [keys.h], false: [keys.up,keys.Lshift,keys.space]}, 'holding_disc_center'],
+        // ['holding_disc_center', {true: [keys.j], false: [keys.q,keys.e]}, 'idle'],
+        
+        ['holding_disc_center', {true: [keys.e], false: [keys.q]}, 'holding_disc_forehand'],
+        ['holding_disc_center', {true: [keys.q], false: [keys.e]}, 'holding_disc_backhand'],
+        
+        ['holding_disc_forehand', {true: [keys.w], false: [keys.q]}, 'holding_disc_center'],
+        ['holding_disc_forehand', {true: [keys.q], false: [keys.w]}, 'holding_disc_backhand'],
 
-    ['holding_disc_backhand', {true: [keys.e], false: [keys.w]}, 'holding_disc_forehand'],
-    ['holding_disc_backhand', {true: [keys.w], false: [keys.e]}, 'holding_disc_center'],
+        ['holding_disc_backhand', {true: [keys.e], false: [keys.w]}, 'holding_disc_forehand'],
+        ['holding_disc_backhand', {true: [keys.w], false: [keys.e]}, 'holding_disc_center'],
 
-    ['holding_disc_forehand', {true: [keys.throw_disc], false: []}, 'throwing_disc_forehand'],
-    ['throwing_disc_forehand', {true: [keys.threw_disc], false: []}, 'idle'],
+        ['holding_disc_forehand', {true: [keys.space], false: []}, 'throwing_disc_forehand'],
+        ['throwing_disc_forehand', {true: [keys.threw_disc], false: []}, 'idle'],
 
-    ['holding_disc_backhand', {true: [keys.throw_disc], false: []}, 'throwing_disc_backhand'],
-    ['throwing_disc_backhand', {true: [keys.threw_disc], false: []}, 'idle'],
-
-
-    // ['throwing_disc_forehand', {true: [keys.throw_disc], false: []}, 'idle'],
-    // ['throwing_disc_backhand', {true: [keys.throw_disc], false: []}, 'idle'],
-    // ['holding_disc_center', {true: [keys.throw_disc], false: []}, 'idle'],
+        ['holding_disc_backhand', {true: [keys.space], false: []}, 'throwing_disc_backhand'],
+        ['throwing_disc_backhand', {true: [keys.threw_disc], false: []}, 'idle'],
 
 
-]
+        // ['throwing_disc_forehand', {true: [keys.throw_disc], false: []}, 'idle'],
+        // ['throwing_disc_backhand', {true: [keys.throw_disc], false: []}, 'idle'],
+        // ['holding_disc_center', {true: [keys.throw_disc], false: []}, 'idle'],
+
+
+    ],
+    'broadcast': [
+        ['idle', {true: [keys.d2], false: []}, 'idle_defence'],
+        ['idle_defence', {true: [keys.d1], false: []}, 'idle'],
+        ['idle', {true: [keys.w], false: []}, 'jogging'],
+        ['idle', {true: [keys.s], false: []}, 'jog_backwards'],
+        ['idle', {true: [keys.f], false: []}, 'shuffle_right'],
+        ['shuffle_right', {true: [], false: [keys.f]}, 'idle'],
+        ['idle', {true: [keys.w,keys.Lshift], false: []}, 'running'],
+        ['idle', {true: [keys.q], false: []}, 'dive_left'],
+        ['idle', {true: [keys.e], false: []}, 'dive_right'],
+        ['idle', {true: [keys.space], false: [keys.up,keys.Lshift]}, 'idle_vertical'],
+
+        ['idle', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
+        ['jogging', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
+        ['jog_backwards', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
+        ['running', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
+        ['running', {true: [keys.r], false: []}, 'turning_back'],
+        ['dive_right', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
+        ['dive_left', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
+        ['idle_vertical', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
+        ['jogging_vertical', {true: [keys.catch_disc], false: []}, 'holding_disc_center'],
+
+        // ['idle', {true: [keys.space,keys.Lshift], false: [keys.up]}, 'throwing_disc_forehand'],
+
+        ['jogging', {true: [keys.w,keys.Lshift], false: []}, 'running'],
+        ['jogging', {true: [keys.w,keys.space], false: []}, 'jogging_vertical'],
+        ['jogging', {true: [], false: [keys.w]}, 'idle'],
+        ['jogging', {true: [keys.q], false: []}, 'dive_left'],
+        ['jogging', {true: [keys.e], false: []}, 'dive_right'],
+        ['jog_backwards', {true: [], false: [keys.s]}, 'idle'],
+
+        ['running', {true: [keys.w], false: [keys.Lshift]}, 'jogging'],
+        ['running', {true: [], false: [keys.w]}, 'idle'],
+        ['running', {true: [keys.q], false: []}, 'dive_left'],
+        ['running', {true: [keys.e], false: []}, 'dive_right'],
+        
+        // ['idle_vertical', {true: [], false: [keys.space]}, 'idle'],
+
+        ['idle', {true: [keys.h], false: [keys.up,keys.Lshift,keys.space]}, 'holding_disc_center'],
+        // ['holding_disc_center', {true: [keys.j], false: [keys.q,keys.e]}, 'idle'],
+        
+        ['holding_disc_center', {true: [keys.e], false: [keys.q]}, 'holding_disc_forehand'],
+        ['holding_disc_center', {true: [keys.q], false: [keys.e]}, 'holding_disc_backhand'],
+        
+        ['holding_disc_forehand', {true: [keys.w], false: [keys.q]}, 'holding_disc_center'],
+        ['holding_disc_forehand', {true: [keys.q], false: [keys.w]}, 'holding_disc_backhand'],
+
+        ['holding_disc_backhand', {true: [keys.e], false: [keys.w]}, 'holding_disc_forehand'],
+        ['holding_disc_backhand', {true: [keys.w], false: [keys.e]}, 'holding_disc_center'],
+
+        ['holding_disc_forehand', {true: [keys.throw_disc], false: []}, 'throwing_disc_forehand'],
+        ['throwing_disc_forehand', {true: [keys.threw_disc], false: []}, 'idle'],
+
+        ['holding_disc_backhand', {true: [keys.throw_disc], false: []}, 'throwing_disc_backhand'],
+        ['throwing_disc_backhand', {true: [keys.threw_disc], false: []}, 'idle'],
+
+
+        // ['throwing_disc_forehand', {true: [keys.throw_disc], false: []}, 'idle'],
+        // ['throwing_disc_backhand', {true: [keys.throw_disc], false: []}, 'idle'],
+        // ['holding_disc_center', {true: [keys.throw_disc], false: []}, 'idle'],
+
+
+    ]
+}
 
 
 const velocity_handler = {
@@ -233,4 +321,4 @@ const side_velocity_handler = {
 }
 
 
-export {keys, player_states, player_transitions, velocity_handler, player_animations, side_velocity_handler};
+export {keys, player_states, player_transitions, velocity_handler, player_animations, side_velocity_handler, rotation_handler};

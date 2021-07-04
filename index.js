@@ -81,45 +81,22 @@ io.on('connection', (client) => {
         client.broadcast.emit('playerPosition',data);
     })
 
+    client.on('turnNeck', function(data){
+        client.broadcast.emit('turnNeck', data)
+    })
 
-    // client.on('playerVelocity',function(data){
-    //     if(players[data.id] != undefined) players[data.id].velocity = data.velocity;
-    //     // if(data.show) console.log(data.velocity)
-    //     // console.log(data.show)
-    //     client.broadcast.emit('playerVelocity',{id:data.id,velocity:data.velocity})
-    // })
-
-    // client.on('playerPosition',function(data){
-    //     // console.log('changing position of',data.id)
-    //     if(players[data.id] != undefined) players[data.id].position = data.position;
-    //     // console.log('Position:',data.position)
-    //     client.broadcast.emit('playerPosition',{id:data.id,position:data.position})
-    // })
-
-    // client.on('playerRotation',function(data){
-    //     if(players[data.id] != undefined) players[data.id].rotation = data.rotation;
-    //     client.broadcast.emit('playerRotation',{id:data.id,rotation:data.rotation})
-    // })
-
-    // client.on('playerState',function(data){
-    //     // console.log('changing state of:',data)
-    //     players[data.id].state = data.state;
-    //     client.broadcast.emit('playerState',{id:data.id,state:data.state})
-    // })
-
-
-    // client.on('discState',function(data){
-    //     disc.state.location = data.location;
-    //     if(data.playerID!=undefined) disc.state.playerID = data.playerID;
-    //     client.broadcast.emit('discState',disc.state)
-    // })
 
     
 
-    // client.on('throw',function(data){
-    //     console.log('disc has been thrown!')
-    //     client.broadcast.emit('throw',data);
-    // })
+    client.on('discThrow',function(data){
+        console.log('disc has been thrown!',data)
+        client.broadcast.emit('discThrow',{...data});
+    })
+
+    client.on('discState',function(data){
+        // console.log('disc has been thrown!')
+        client.broadcast.emit('discState',data);
+    })
 
     client.on('log',function(data){
         console.log('[user'+ids[client.id]+']: ',...data.data)

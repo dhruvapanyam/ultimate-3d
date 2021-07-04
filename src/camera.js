@@ -35,28 +35,68 @@ class ThirdPersonCamera {
 
         this.angle_offset = 0;
 
-        this.mouse = [0,0]
+        this.mouse = new THREE.Vector2();
 
-        document.addEventListener('mousemove',e=>{
-            this.mouse[0] = (e.clientX / window.innerWidth) - 0.5
-            this.mouse[1] = (e.clientY / window.innerHeight) - 0.5
-        })
+        // document.addEventListener('mousemove',e=>{
+        //     this.mouse[0] = (e.clientX / window.innerWidth) - 0.5
+        //     this.mouse[1] = (e.clientY / window.innerHeight) - 0.5
+        // })
+
+        this.aimx=0;
+        this.aimy=0;
+
+
+
+        
+    }
+
+    updateMovement(inp){
+        let aimx = 0, aimy = 0;
+        let r = inp['KeyD'], l = inp['KeyA'], d = inp['KeyS'], u = inp['KeyW'];
+
+        if(u) aimy = -0.4
+
+        if(d){
+            if(r || l)
+                aimx = 0.5
+            else
+                aimy = u ? aimy : 0.2
+        }
+        else if(r || l)
+            aimx = 0.25
+        
+        if(l) aimx *= -1
+
+
+
+        this.mouse.lerp(new THREE.Vector2(aimx,aimy), 0.1)
+
+        let change = false;
+        if(aimx != this.aimx || aimy != this.aimy)
+            change = true;
+        // if(change) console.log('aim changed')
+        this.aimx = aimx;
+        this.aimy = aimy;
+
+        return change;
+        
+
     }
 
     update(rot, pos, thrower=false){
-        this.angle_offset = this.mouse[0] * Math.PI * -1.9
+        this.angle_offset = this.mouse.x * Math.PI * -1.8
 
         let ang = rot;
-        let y_look = 0;
-        let y_pos = 15;
+        let y_look = 5;
+        let y_pos = 12;
         let dist_from_player = 20;
-        let forward_look = 30
+        let forward_look = 5
 
         if(!thrower){
             ang = rot + this.angle_offset;
-            y_look = 20 * (0.3 - this.mouse[1]);
-            y_pos = 15 + this.mouse[1] * 30;
-            dist_from_player = 10 + 50 * (0.5 - Math.abs(this.mouse[1]));
+            y_look = 20 * (0.3 - this.mouse.y);
+            y_pos = 15 + this.mouse.y * 30;
+            dist_from_player = 10 + 50 * (0.5 - Math.abs(this.mouse.y));
             forward_look = 0;
         }
 
@@ -68,7 +108,7 @@ class ThirdPersonCamera {
         temp.z = pos.z - z_comp * dist_from_player
         temp.y = y_pos
 
-        if(thrower) this.camera.position.lerp(temp,0.5)
+        if(thrower) this.camera.position.lerp(temp,0.1)
         else this.camera.position.lerp(temp,0.08)
 
 
@@ -78,6 +118,8 @@ class ThirdPersonCamera {
         ltemp.z += forward_look * z_comp
 
         this.camera.lookAt(ltemp);
+
+        return [this.aimx,this.aimy];
     }
 }
 

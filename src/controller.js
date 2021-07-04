@@ -7,7 +7,7 @@ import {init_assets, MODELS, ANIMATIONS} from './loaders'
 
 
 
-import {keys, player_states, player_transitions, velocity_handler, side_velocity_handler} from './state_manager'
+import {keys, player_states, player_transitions, velocity_handler, side_velocity_handler, rotation_handler} from './state_manager'
 
 const characters = {
     'mannequin': {
@@ -19,13 +19,15 @@ const characters = {
     'sophie': {
         bone: 6,
         anim_path: 'mannequin/',
-        slice: 9
+        slice: 9,
+        hair: 5
     },
 
     'shannon': {
         bone: 0,
         anim_path: 'mannequin/',
-        slice: 10
+        slice: 10,
+        hair: 7
     }
 }
 
@@ -44,6 +46,8 @@ class CharacterController {
         // this.input = input;
 
         this.scene = scene;
+
+        this.throwing = false;
     }
 
     getPosition(){
@@ -53,6 +57,12 @@ class CharacterController {
     getBonePosition(){
         if(this.loading) return new Vector3();
         return this.center_bone.getWorldPosition();
+    }
+
+    changePreset(p){
+        if(this.loading) return;
+        this.current_preset = p;
+
     }
 
 
@@ -67,14 +77,26 @@ class CharacterController {
             // this.entity.scale.set(0.0025,0.0025,0.0025)
 
             this.bones = {};
+
             let cur = [this.entity.children[characters[this.character].bone]];
+            let uuid = this.entity.children[characters[this.character].bone].id;
             while(cur.length > 0){
                 let bone = cur[0]
                 bone.name = 'mixamorig1' + bone.name.slice(characters[this.character].slice);
                 this.bones[bone.name] = bone;
                 cur = cur.slice(1);
                 for(let c of bone.children) cur.push(c)
+
+                if(bone.name == 'mixamorig1Neck')
+                    this.neck = bone.id
+
             }
+
+            console.log(this.entity)
+
+            // console.log(this.entity.children[characters[this.character].bone])
+            // console.log(this.neck, this.bones['mixamorig1Neck'].getObjectById(this.neck))
+            // console.log(uuid, this.scene.getObjectById(uuid))
 
             // this.center_bone = this.bones[characters[this.character].rig];
             this.center_bone = this.bones['mixamorig1Hips'];
@@ -88,13 +110,23 @@ class CharacterController {
             if(this.control == true){
                 // this.camera = new ThirdPersonCamera(this);
                 this.input = new CharacterControllerInput()
-                this.FSM = new FiniteStateMachine(this, player_states)
+                this.FSM = {}
 
-                for(let trans of player_transitions){
-                    let [prev, req, next] = trans;
-                    // // console.log('Prev:',prev,'Req:',req,'Next:',next)
-                    this.addTransition(prev, req, next)
+                this.current_preset = 'pov'
+
+                for(let preset in player_transitions){
+                    this.FSM[preset] = new FiniteStateMachine(this, player_states)
+                    for(let trans of player_transitions[preset]){
+                        let [prev, req, next] = trans;
+                        // // console.log('Prev:',prev,'Req:',req,'Next:',next)
+                        this.addTransition(preset, prev, req, next)
+                    }
+                    
                 }
+
+                this.entity.remove(this.entity.children[characters[this.character].hair])
+                // console.log(this.entity)
+            
             }
             else{
                 this.current_anim = 'idle_offence'
@@ -135,9 +167,43 @@ class CharacterController {
     }
 
 
-    addTransition(prev, req, next, options={}){
+    addTransition(preset, prev, req, next, options={}){
         // // console.log('CharacterController::addTransition: calling inner functions');
-        this.FSM.addTransition(prev, req, next, options)
+        this.FSM[preset].addTransition(prev, req, next, options)
+    }
+
+
+    turnNeck(look,tilt_back=false){
+        if(this.loading == true) return;
+        this.entity.traverse(obj => {
+            if(obj.isBone){
+                if(obj.name.split('mixamorig1')[1] in {'Neck':1,'Head':1,'HeadTop_End':1})
+                    // obj.translateX(0.1)
+                {
+                    // look: [x,y] (-0.5 to 0.5)
+                    let [x,y] = look;
+                    let trot = new Vector3()
+                    obj.rotation.x = Math.abs(x) * 0.4 + y * 0.7
+                    obj.rotation.z = -x * 0.2
+                    obj.rotation.y = -x * 0.7
+                    if(tilt_back == true) {obj.rotation.x /= 3; obj.rotation.z /= 2}
+                    
+                }
+            }
+
+        })
+        
+    }
+
+    getAnimationTimeout(){
+        if(!this.throwing) return 1;
+
+        if(this.state == 'throwing_disc_forehand'){
+            return 0.8 - this.animations['throwing_disc_forehand'].time
+        }
+        if(this.state == 'throwing_disc_backhand'){
+            return 1 - this.animations['throwing_disc_backhand'].time
+        }
     }
 
 
@@ -145,23 +211,28 @@ class CharacterController {
     processInput(inp){
 
         
-        let new_state = this.FSM.updateState(inp);
+        let new_state = this.FSM[this.current_preset].updateState(inp);
 
         if(new_state == null) return;
         else {
 
-            // if(new_state.)
+            // if(new_state.next)
             
             // need to transition to new_state  
 
-            let prev = this.FSM.states[new_state.prev].animation;
-            let next = this.FSM.states[new_state.next].animation;
+            let prev = this.FSM[this.current_preset].states[new_state.prev].animation;
+            let next = this.FSM[this.current_preset].states[new_state.next].animation;
             let options = new_state.options;
+
+            if(next == 'throwing_disc_forehand' || next == 'throwing_disc_backhand'){
+                this.throwing = true;
+            }
+            else this.throwing = false;
 
             // socket.emit('playerState',{id:PLAYER_ID, state:next});
     
 
-            console.log(prev,'to',next)
+            console.log(new_state.prev,'to',new_state.next)
 
             // // console.log('CharacterController::processInput: Transitioning from',prev,'to',next,'! Options:',options);
 
@@ -186,9 +257,12 @@ class CharacterController {
                 this.entity.rotation.y += Math.PI
             }
 
+            // this.animations[next].crossFadeFrom(this.animations[prev], 0.3, true);
 
+
+            this.animations[prev].fadeOut(0.15)
+            // this.animations[next].fadeIn(0.25)
             this.animations[next].play()
-            this.animations[prev].fadeOut(0.25)
             // this.animations[prev].stop()
             
             
@@ -204,13 +278,14 @@ class CharacterController {
         
     }
 
-    updateVelocity(delta){
+    updateVelocity(delta,hasDisc){
+        if(this.loading == true) return;
         let new_vel = [this.velocity[0], this.velocity[1]];
 
         if(velocity_handler[this.state] != undefined){
             let options = {
                 cur_vel: this.velocity[0],
-                anim_time: this.animations[this.FSM.states[this.state].animation].time
+                anim_time: this.animations[this.FSM[this.current_preset].states[this.state].animation].time
             }
             new_vel[0] = velocity_handler[this.state](options);
         }
@@ -218,7 +293,7 @@ class CharacterController {
         if(side_velocity_handler[this.state] != undefined){
             let options = {
                 cur_vel: this.velocity[1],
-                anim_time: this.animations[this.FSM.states[this.state].animation].time
+                anim_time: this.animations[this.FSM[this.current_preset].states[this.state].animation].time
             }
             new_vel[1] = side_velocity_handler[this.state](options);
         }
@@ -240,8 +315,10 @@ class CharacterController {
 
 
         let flag = 0;
-        if(this.input.keys[keys.d] == true) {this.entity.rotation.y -= Math.PI/60; flag = 1;}
-        else if(this.input.keys[keys.a] == true) {this.entity.rotation.y += Math.PI/60; flag = 1;}
+        let pMode = 'cutter'
+        if(hasDisc) pMode = 'thrower'
+        if(this.input.keys[rotation_handler[this.current_preset][pMode].right] == true) {this.entity.rotation.y -= Math.PI/60; flag = 1;}
+        else if(this.input.keys[rotation_handler[this.current_preset][pMode].left] == true) {this.entity.rotation.y += Math.PI/60; flag = 1;}
         if(flag){
             // socket.emit('playerRotation',{id:PLAYER_ID, rotation:this.entity.rotation.y})
             // this.updatePlayerRotation()
@@ -259,7 +336,7 @@ class CharacterController {
     }
 
 
-    update(delta){
+    update(delta, hasDisc=false){
 
         if(this.loading){
             this.loadAssets()
@@ -268,7 +345,7 @@ class CharacterController {
 
         this.mixer.update(delta)
         // this.camera.update(this.entity)
-        this.updateVelocity(delta)
+        this.updateVelocity(delta, hasDisc)
         this.processInput(this.input.keys)
 
 
@@ -276,7 +353,7 @@ class CharacterController {
         return {
             state: this.state,
             velocity: this.velocity,
-            current_anim: this.FSM.states[this.state].animation,
+            current_anim: this.FSM[this.current_preset].states[this.state].animation,
             rotation: this.entity.rotation.y
         }
         

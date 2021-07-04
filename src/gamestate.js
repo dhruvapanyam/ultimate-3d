@@ -4,12 +4,14 @@ import {Vector3} from 'three'
 
 import {BroadcastCamera, ThirdPersonCamera} from './camera';
 
-import {MiniMap} from './HUD';
+import {MiniMap, DiscThrowArc, ThrowData} from './HUD';
+
+import * as THREE from 'three'
 
 
 
 class GameState {
-    constructor(socket, scene, minimap_canvas, field_dimensions){
+    constructor(socket, scene, minimap_canvas, field_dimensions, speed_canvas){
 
         // console.log('GameState Constructor')
 
@@ -34,23 +36,56 @@ class GameState {
         this.throw_data = {
             forward_speed: 0,
             upward_speed: 0,
-            AOI: 0,
+            AOI: Math.PI/12,
             AOT: 0,
-            direction: 0
+            direction: 0,
+            spin: 1
         }
 
-        // this.cam = new BroadcastCamera(new Vector3(-110,60,0), new Vector3(-50,0,0), this.scene)
-        this.cam = new ThirdPersonCamera(this.scene);
+        this.cams = {
+            'broadcast': new BroadcastCamera(new Vector3(-110,60,0), new Vector3(-50,0,0), this.scene),
+            'pov': new ThirdPersonCamera(this.scene)
+        }
+
+        this.camera_type = 'pov'
+
 
 
         this.field_dimensions = field_dimensions
         this.map = new MiniMap(minimap_canvas, 0.2, field_dimensions[0]);
 
+
+        this.setupUserControls();
+
+
+        this.throw_arrow = new THREE.ArrowHelper(new Vector3(0,0,1), new Vector3(0,7,0), 10);
+
+        this.disc_arc = new DiscThrowArc(this.scene);
+
+        this.speed_bar = new ThrowData(speed_canvas, 0.2);
         
     }
 
     log(...args){
         this.socket.emit('log',{data:args})
+    }
+
+
+    setupUserControls(){
+        window.addEventListener('keydown', e => {
+            if(e.code == 'KeyC'){
+                this.tryCatchingDisc();
+            }
+            else if(e.code == 'KeyZ'){
+                this.tryCatchingDisc(true)
+            }
+            else if(e.code == 'KeyP'){
+                this.changeCamera('pov');
+            }
+            else if(e.code == 'KeyB'){
+                this.changeCamera('broadcast')
+            }
+        })
     }
 
     updateDisc(delta){
@@ -81,7 +116,7 @@ class GameState {
         if(this.players[this.player_id] == undefined) return;
         // console.log('updating my player')
 
-        let pstate = this.players[this.player_id].update(delta);
+        let pstate = this.players[this.player_id].update(delta, this.holdingDisc());
 
         let unequal = false;
         for(let key in pstate){
@@ -98,6 +133,9 @@ class GameState {
             this.socket.emit('playerState',{id:this.player_id,state:this.player_state})
         }
 
+
+        if(this.playerReady()) document.getElementById('rot-value').innerHTML = this.players[this.player_id].entity.rotation.y
+
     }
 
     updatePlayers(delta){
@@ -107,13 +145,50 @@ class GameState {
         }
     }
 
+    playerReady(){
+        return this.player_id != null && this.players[this.player_id].loading == false;
+    }
+
     updateCamera(){
         if(this.player_id == null) return;
-        // this.cam.update(this.players[this.player_id].getPosition());
-        if(this.disc.state.playerID == this.player_id)
-            this.cam.update(this.player_state.rotation, this.disc.getPosition(), true);
-        else
-            this.cam.update(this.player_state.rotation, this.players[this.player_id].getPosition());
+
+        if(this.camera_type == 'broadcast'){
+            this.cams[this.camera_type].update(this.players[this.player_id].getPosition());
+        }
+        else if(this.camera_type == 'pov'){
+            let plook, change = false;
+            if(this.playerReady()) change = this.cams[this.camera_type].updateMovement(this.players[this.player_id].input.keys)
+
+            if(this.players[this.player_id].throwing) return;
+
+            let temp;
+            if(this.holdingDisc())
+                temp = this.cams[this.camera_type].update(this.player_state.rotation, this.getThrowAxisPoint(), true);
+            else
+                temp = this.cams[this.camera_type].update(this.player_state.rotation, this.players[this.player_id].getPosition());
+
+            if(this.playerReady() && !this.holdingDisc() && change){
+                // console.log('neck change 2',change)
+                plook = temp;
+                this.socket.emit('turnNeck',{id:this.player_id, look:[plook[0],plook[1]], tilt: false})
+                this.players[this.player_id].turnNeck(plook);
+            }
+        }
+    }
+
+    turnNeck(pid, look, tilt){
+        if(this.players[pid] == undefined || this.players[pid].loading == true) return;
+        // this.log('turning neck:',look,tilt)
+        this.players[pid].turnNeck(look, tilt);
+    }
+
+    getThrowAxisPoint(){
+        let ang = this.players[this.player_id].entity.rotation.y
+        let axis_point = this.players[this.player_id].getPosition().clone();
+        if(this.players[this.player_id].state == 'holding_disc_forehand') axis_point = axis_point.add(new Vector3(-Math.cos(ang) * 8,0, Math.sin(ang) * 8))
+        else if(this.players[this.player_id].state == 'holding_disc_backhand') axis_point = axis_point.add(new Vector3(Math.cos(ang) * 7,0, -Math.sin(ang) * 7))
+        return axis_point;
+                
     }
 
     updateHUD(){
@@ -124,6 +199,60 @@ class GameState {
         }
 
         this.map.update(p,[d.z,-d.x])
+
+        if(this.holdingDisc()){
+            // this.scene.remove(this.throw_arrow)
+            let ang = this.players[this.player_id].entity.rotation.y
+            // this.throw_arrow = new THREE.ArrowHelper(new Vector3(Math.sin(ang),0,Math.cos(ang)), this.disc.getPosition().clone().setY(3), 10)
+            // this.scene.add(this.throw_arrow)
+
+            let disc_look = 0, change = false;
+            if(this.players[this.player_id].throwing){
+                // disc_look = this.disc_arc.update(this.disc.getPosition().clone().setY(4), ang, this.players[this.player_id].input.keys);
+            }
+            else{
+                // else if()
+                [disc_look,change] = this.disc_arc.update(this.getThrowAxisPoint().setY(4), ang, this.players[this.player_id].input.keys);
+                this.throw_data.direction = ang - disc_look * Math.PI/3
+                this.throw_data.upward_speed = this.disc_arc.height;
+            }
+
+
+
+            disc_look /= 4;
+            let tilt_back = false;
+            if(this.players[this.player_id].state == 'holding_disc_forehand') {disc_look -= 0.15; tilt_back = true;}
+            else if(this.players[this.player_id].state == 'holding_disc_backhand') {disc_look += 0.3; tilt_back = true;}
+            if(change){
+                // console.log('neck change 1')
+                this.socket.emit('turnNeck',{id:this.player_id, look:[disc_look,0], tilt: tilt_back})
+                this.players[this.player_id].turnNeck([disc_look, 0], tilt_back);
+            }
+
+
+
+            this.speed_bar.update(this.throw_data);
+            
+        }
+    }
+
+    updateThrow(){
+        if(!this.holdingDisc() || !this.players[this.player_id].throwing) {
+            this.throw_data.forward_speed = 0;
+            this.throw_data.AOT = 0;
+            return;
+        }
+
+        this.tryThrowingDisc();
+
+        if(this.players[this.player_id].input.keys['Space'] == true) this.throw_data.forward_speed = Math.min(this.throw_data.forward_speed + 3, 100);
+        this.throw_data.AOI = Math.PI/18 + (1 - this.throw_data.forward_speed/100) * (Math.PI/12 - Math.PI/18)
+
+        if(this.players[this.player_id].input.keys['ArrowRight'] == true) this.throw_data.AOT = Math.min(this.throw_data.AOT + Math.PI/120, Math.PI/3);
+        else if(this.players[this.player_id].input.keys['ArrowLeft'] == true) this.throw_data.AOT = Math.max(this.throw_data.AOT - Math.PI/120, -Math.PI/3);
+
+
+        // if(this.players[this.player_id].input.keys['KeyF'] == true) this.throw_data.forward_speed = Math.min(this.throw_data.forward_speed + 1, 100);
     }
 
     update(delta){
@@ -133,6 +262,8 @@ class GameState {
         this.updatePlayers(delta);
         this.updateCamera()
         this.updateHUD();
+
+        this.updateThrow();
     }
 
     addPlayer(id, control = false){
@@ -153,7 +284,9 @@ class GameState {
     }
 
     removePlayer(id){
-        if(!(id in players)) return;
+        if(!(id in this.players)) return;
+        if(this.disc.state.playerID == id) this.groundDisc();
+
         this.lobby.remove(id);
         this.scene.remove(players[id])
         delete players[id];
@@ -169,28 +302,65 @@ class GameState {
 
     initializeDisc(data){
         // data: {state, position}
+        if(this.disc.state == undefined) return;
         this.disc.state.location = data.state.location
         this.disc.state.playerID = data.state.playerID
 
     }
 
+    holdingDisc(){
+        return this.player_id != null && this.disc.state.playerID == this.player_id 
+    }
 
-    tryCatchingDisc(){
+
+
+    tryThrowingDisc(){
+        let timeFromRelease = this.players[this.player_id].getAnimationTimeout();
+        if(timeFromRelease < 0.05) {
+            // console.log(this.throw_data)
+            if(this.players[this.player_id].state == 'throwing_disc_forehand'){
+                this.throw_data.spin = -1;
+            }
+            else{
+                this.throw_data.spin = 1;
+            }
+            this.socket.emit('discThrow',{...this.throw_data});
+            this.throwDisc();
+
+            this.disc_arc.hide()
+            this.speed_bar.hide();
+
+            this.players[this.player_id].input.keys['catch_disc'] = false;
+            this.players[this.player_id].input.keys['threw_disc'] = true;
+        }
+    }
+
+
+    tryCatchingDisc(override=false){
         // this.log('trying to catch disc')
         if(this.disc.state.location == 'hand') return;
         if(this.players[this.player_id].loading == true) return;
-        if(this.disc.getPosition().distanceTo(this.players[this.player_id].getPosition()) > 8) return;
+        if(!override && this.disc.getPosition().distanceTo(this.players[this.player_id].getPosition()) > 8) return;
 
-        this.log('catching disc')
+        // this.log('catching disc',this.players[this.player_id].input.keys['KeyZ'])
         this.players[this.player_id].catchDisc();
 
         this.catchDisc(this.player_id);
+
+        // this.scene.add(this.throw_arrow)
+        this.disc_arc.display()
+        this.speed_bar.display()
+    }
+
+    changeDiscState(state){
+        this.disc.state = {...state};
     }
 
 
     catchDisc(pid){
         this.disc.state.location = 'hand';
         this.disc.state.playerID = pid;
+        this.socket.emit('discState',{...this.disc.state})
     }
 
     groundDisc(){
@@ -198,8 +368,10 @@ class GameState {
         this.disc.state.playerID = null;
     }
 
-    throwDisc(){
-        this.disc.throw(this.throw_data);
+    throwDisc(data = this.throw_data){
+
+        this.disc.throw({...data});
+
     }
 
 
@@ -219,6 +391,13 @@ class GameState {
         for(let key in data){
             this.throw_data[key] = data[key]
         }
+    }
+
+
+
+    changeCamera(cam){
+        this.camera_type = cam;
+        this.players[this.player_id].changePreset(cam);
     }
 
 

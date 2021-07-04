@@ -42,6 +42,8 @@ class DiscEntity {
             this.throw_z = 0;
     
             this.throw_side = 0;
+
+            this.spin = 1;  // BH = 1, FH = -1
     
             // State
     
@@ -58,6 +60,10 @@ class DiscEntity {
         
     }
 
+    OI(){
+        return (this.spin > 0) == (this.angle_of_tilt > 0)
+    }
+
 
     getPosition(){
         if(this.mesh == undefined) return new Vector3();
@@ -65,6 +71,7 @@ class DiscEntity {
     }
 
     updatePosition(t, follow_bone=null){
+        t *= 3
         if(this.state.location == 'hand'){
             
             follow_bone.getWorldPosition(this.mesh.position);
@@ -111,12 +118,14 @@ class DiscEntity {
                 else flight_case = 4;
             }
 
+            const C1 = 0.25;
+
             switch(flight_case){
                 
                 case 1:
                     f1 = W * sin(AOI - AOM);
                     h = W * cos(AOI - AOM);
-                    f2 = disc_flight_params.C1 * h;
+                    f2 = C1 * h;
 
                     
                     break;
@@ -124,21 +133,23 @@ class DiscEntity {
                 case 2:
                     f1 = - W * sin(AOM - AOI);
                     h = W * Math.cos(AOM - AOI);
-                    f2 = disc_flight_params.C1 * h;
+                    f2 = C1 * h;
 
                     break;
                 
                 case 3:
+                    // console.log('3')
                     f1 = W * sin(AOI + AOM);
                     h = W * cos(AOI + AOM);
-                    f2 = disc_flight_params.C1 * h;
+                    f2 = C1 * h;
 
                     break;
                 
                 case 4:
+                    // console.log('4')
                     f1 = W * sin(Math.PI - (AOI + AOM));
                     h = W * cos(Math.PI - (AOI + AOM));
-                    f2 = disc_flight_params.C1 * h;
+                    f2 = C1 * h;
 
                     break;
                 
@@ -154,11 +165,18 @@ class DiscEntity {
             let lift = l1 + l2;
             let drag = d1 + d2;
 
+            // if(flight_case == 3) {
+            //     // console.log('3')
+            //     lift *= 4;
+            // }
+
+            // console.log(flight_case)
+
 
             let P = new Vector3(); // new position
             let V = new Vector3();
 
-            let translation = 3 * sin(AOT);
+            let translation = 2 * sin(AOT);
 
             let side_x_comp = -this.throw_z;
             let side_z_comp = this.throw_x;
@@ -169,6 +187,7 @@ class DiscEntity {
             V.z = v.z - ( (drag * t) * this.throw_z ) //+ ( this.throw_side * side_z_comp);
 
 
+            
             // update velocity
 
                 // s = ut + Ft^2/2
@@ -177,6 +196,20 @@ class DiscEntity {
             let s = (v.y * t) + (t*t*F/2)
 
                 // v^2 = 2Fs + u^2
+            // console.log(s)
+            if(s < 0.1){
+                let factor = this.OI() ? 0.3 : 1
+                if(Math.abs(this.angle_of_tilt) > Math.PI/5){
+                    this.throw_side /= 1.001
+                    factor /= 2
+                }
+                if(this.angle_of_tilt < 0){
+                    this.angle_of_tilt = Math.min(this.angle_of_tilt + 0.02*factor, 0)
+                }
+                else{
+                    this.angle_of_tilt = Math.max(this.angle_of_tilt - 0.02*factor, 0)
+                }
+            }
 
             if(s > 0){
                 // still moving upwards, so +ve
@@ -184,7 +217,21 @@ class DiscEntity {
             }
             else{
                 // moving downwards => -ve 
-                V.y = -Math.sqrt(2*F*s + (v.y * v.y))
+                
+                V.y = -Math.sqrt(2*F*s + (v.y * v.y)) * 0.99
+                if(!this.OI()){
+                    if(V.y < -7)
+                    {
+                        V.y = -7;
+                    }
+                }
+                else{
+                    // console.log('blade')
+                    if(V.y < -15)
+                    {
+                        V.y = -15
+                    }
+                }
                 
             }
 
@@ -226,6 +273,7 @@ class DiscEntity {
 
             // change lookvactor's X-Z values by moving them to the side
             let side_look = Math.tan(AOT);
+            // if(AOT == 0) console.log('up')
             look_vector.x += side_look * side_x_comp
             look_vector.z += side_look * side_z_comp
 
@@ -255,17 +303,20 @@ class DiscEntity {
     throw(THROW){
         // // console.log('throwing')
 
+        console.log('Throwing disc:',THROW)
         
 
+        this.spin = THROW.spin;
+        
         let angle = THROW.direction;
         let y_force = THROW.upward_speed;
-        let speed = THROW.forward_speed * 2/3 + 10;
+        let speed = THROW.forward_speed / 5 + 10;
         this.angle_of_incidence = THROW.AOI;
         this.angle_of_tilt = THROW.AOT;
 
 
-        this.throw_x = Math.cos(angle)
-        this.throw_z = Math.sin(angle)
+        this.throw_x = Math.sin(angle)
+        this.throw_z = Math.cos(angle)
 
         // this.angle_of_incidence = disc_flight_params.theta * Math.PI / 180;
 

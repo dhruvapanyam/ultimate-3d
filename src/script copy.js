@@ -134,7 +134,7 @@ scene.add(FIELD)
 
 import {GameState} from './gamestate'
 
-const GAME = new GameState(socket, scene, document.getElementById('minimap-canvas'), [fieldLength, fieldWidth]);
+const GAME = new GameState(socket, scene, document.getElementById('minimap-canvas'), [fieldLength, fieldWidth], document.getElementById('speed-canvas'));
 
 
 // Events
@@ -165,6 +165,11 @@ const mouse = new THREE.Vector2();
 const clock = new THREE.Clock()
 let prev = 0
 
+let fps = []
+for(let i=0;i<60;i++) fps.push(1/60);
+let fpssum = 1;
+let counter = 0;
+
 const tick = () =>
 {
 
@@ -172,10 +177,17 @@ const tick = () =>
     let delta = elapsedTime - prev
     prev = elapsedTime
 
+    fpssum += delta - fps[counter]
+    fps[counter] = delta;
+    counter = (counter+1) % 60;
+
 
     GAME.update(delta);
 
-    renderer.render(GAME.scene, GAME.cam.camera)
+    document.getElementById('users-value').innerHTML = GAME.lobby.size;
+    document.getElementById('fps-value').innerHTML = Math.round(60 / fpssum);
+
+    renderer.render(GAME.scene, GAME.cams[GAME.camera_type].camera)
     
 
 
@@ -189,11 +201,6 @@ tick()
 
 // ------------------------- USER CONTROLS
 
-window.addEventListener('keydown', e => {
-    if(e.code == 'KeyC'){
-        GAME.tryCatchingDisc();
-    }
-})
 
 // ------------------------- SOCKET HANDLING
 
@@ -231,3 +238,32 @@ socket.on('playerState', data => {
 socket.on('playerPosition', data => {
     GAME.movePlayer(data.id, data.position);
 })
+
+socket.on('turnNeck', data => {
+    GAME.turnNeck(data.id, data.look, data.tilt);
+})
+
+socket.on('discThrow', data => {
+    log('throwing:',data)
+    GAME.throwDisc(data);
+})
+
+socket.on('discState', data => {
+    log('disc:',data)
+    GAME.changeDiscState(data)
+})
+
+
+socket.on('removePlayer', data => {
+    GAME.removePlayer(data.id)
+})
+
+
+
+socket.on('ping', data => {
+    document.getElementById('ping-value').innerHTML = new Date().getTime() - data.time;
+})
+
+setInterval(()=>{
+    socket.emit('ping',{time: new Date().getTime()})
+},3000)
