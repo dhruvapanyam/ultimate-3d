@@ -2,7 +2,7 @@
 import './style.css'
 import * as THREE from 'three'
 import { AnimationMixer, Vector2, Vector3 } from 'three'
-import {loadModel, loadAnimation} from './loaders'
+import {loadModel, loadAnimation, MODELS, ANIMATIONS, cloneFbx} from './loaders'
 import {player_animations} from './state_manager'
 
 
@@ -72,13 +72,9 @@ class CharacterController {
 
 
     loadAssets(){
-        loadModel('shannon', (model) => {
+        if('shannon' in MODELS){
 
-            // console.log('LoadModel::callback')
-            // console.log('Received model:',model)
-            // console.log('Loading assets for player',this.id)
-
-            this.entity = model;
+            this.entity = cloneFbx(MODELS['shannon']);
             // this.entity.scale.set(0.0025,0.0025,0.0025)
 
             this.bones = {};
@@ -122,7 +118,7 @@ class CharacterController {
                     
                 }
 
-                this.entity.remove(this.entity.children[characters[this.character].hair])
+                // this.entity.remove(this.entity.children[characters[this.character].hair])
                 // // console.log(this.entity)
             
             }
@@ -138,16 +134,13 @@ class CharacterController {
                 this.loading = false;
                 this.setupAnimations();
             }
+        }
 
-        })
 
-
-        loadAnimation(player_animations, (anims) => {
-
-            // console.log('LoadAnimation::callback. Received animations:',anims)
+        if(Object.keys(ANIMATIONS).length == player_animations.size){
             this.temp_anims = {}
-            for(let clipname in anims){
-                this.temp_anims[clipname] = anims[clipname]
+            for(let clipname in ANIMATIONS){
+                this.temp_anims[clipname] = ANIMATIONS[clipname]
             }
 
             this.loading_animations = false;
@@ -155,9 +148,7 @@ class CharacterController {
                 this.loading = false;
                 this.setupAnimations()
             }
-
-        })
-        
+        }
 
     }
 
@@ -348,7 +339,10 @@ class CharacterController {
 
     update(delta, hasDisc=false){
 
-        if(this.loading == true) return {};
+        if(this.loading == true) {
+            this.loadAssets();
+            return {};
+        }
 
         this.mixer.update(delta)
         // this.camera.update(this.entity)
@@ -367,7 +361,10 @@ class CharacterController {
     }
 
     updateRemote(delta){
-        if(this.loading == true) return;
+        if(this.loading == true) {
+            this.loadAssets()
+            return;
+        }
 
         this.mixer.update(delta)
 

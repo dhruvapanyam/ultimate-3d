@@ -18,10 +18,41 @@ class GameState {
         this.scene = scene;
         this.socket = socket;
 
+        this.ready = false;
+        this.updateInterval = null;
+        this.disc = new DiscEntity(this.scene);
+        
+        this.reset();
+        this.setupUserControls();
+
+
+        this.disc_arc = new DiscThrowArc(this.scene);
+        this.speed_bar = new ThrowData(speed_canvas, 0.2);
+        
+
+        this.field_dimensions = field_dimensions
+        this.map = new MiniMap(minimap_canvas, 0.2, this.field_dimensions[0]);
+
+    }
+
+    reset(){
+        this.ready = false;
+
+        for(let pid in this.players){
+            this.scene.remove(this.players[pid].entity);
+        }
+
+        this.throw_data = {
+            forward_speed: 0,
+            upward_speed: 0,
+            AOI: Math.PI/12,
+            AOT: 0,
+            direction: 0,
+            spin: 1
+        }
         this.lobby = new Set();
 
         this.players = {}
-        this.disc = new DiscEntity(this.scene);
 
         this.player_id = null; // user's player ID
         this.player_state = {  // for socket updates
@@ -49,22 +80,13 @@ class GameState {
 
         this.camera_type = 'pov'
 
+        if(this.updateInterval != null) clearInterval(this.updateInterval)
+        this.updateInterval = null;
 
 
-        this.field_dimensions = field_dimensions
-        this.map = new MiniMap(minimap_canvas, 0.2, field_dimensions[0]);
-
-
-        this.setupUserControls();
-
-
-        this.throw_arrow = new THREE.ArrowHelper(new Vector3(0,0,1), new Vector3(0,7,0), 10);
-
-        this.disc_arc = new DiscThrowArc(this.scene);
-
-        this.speed_bar = new ThrowData(speed_canvas, 0.2);
-        
     }
+
+
 
     log(...args){
         this.socket.emit('log',{data:args})
@@ -202,10 +224,7 @@ class GameState {
         this.map.update(p,[d.z,-d.x])
 
         if(this.holdingDisc()){
-            // this.scene.remove(this.throw_arrow)
             let ang = this.players[this.player_id].entity.rotation.y
-            // this.throw_arrow = new THREE.ArrowHelper(new Vector3(Math.sin(ang),0,Math.cos(ang)), this.disc.getPosition().clone().setY(3), 10)
-            // this.scene.add(this.throw_arrow)
 
             let disc_look = 0, change = false;
             if(this.players[this.player_id].throwing){
@@ -268,14 +287,14 @@ class GameState {
     }
 
     addPlayer(id, control = false){
-        // console.log('Adding player to gamestate')
+        console.log('Adding player to gamestate')
         this.lobby.add(id);
 
         if(control == true) {
             this.players[id] = new CharacterController(id, 'shannon', this.scene, true);
             this.player_id = id;
 
-            setInterval(()=>{
+            this.updateInterval = setInterval(()=>{
                 this.socket.emit('playerPosition',{id:this.player_id, position:this.players[id].getPosition()})
             }, 3000)
         }
@@ -287,6 +306,8 @@ class GameState {
     removePlayer(id){
         if(!(id in this.players)) return;
         if(this.disc.state.playerID == id) this.groundDisc();
+
+        if(id == this.player_id) clearInterval(this.updateInterval);
 
         this.lobby.delete(id);
         this.scene.remove(this.players[id].entity)
@@ -349,7 +370,6 @@ class GameState {
 
         this.catchDisc(this.player_id);
 
-        // this.scene.add(this.throw_arrow)
         this.disc_arc.display()
         this.speed_bar.display()
     }

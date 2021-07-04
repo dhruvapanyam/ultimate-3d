@@ -10,6 +10,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import * as dat from 'dat.gui'
 import gsap from 'gsap'
 import { AnimationMixer, Vector2, Vector3 } from 'three'
+import {downloads} from './loaders'
 
 const log = (...args) => {
     socket.emit('log',{data:args});
@@ -22,6 +23,7 @@ const gui = new dat.GUI()
 
 // Canvas
 const canvas = document.querySelector('canvas.webgl')
+canvas. style. webkitFilter = "blur(3px)"
 
 // Scene
 const scene = new THREE.Scene()
@@ -74,6 +76,7 @@ camera.position.x = -120
 camera.position.y = 50
 camera.position.z = 0
 scene.add(camera)
+var cam_rot_ang = 0;
 camera.lookAt(-50,0,0)
 
 /**
@@ -129,6 +132,14 @@ const FIELD = new THREE.Line(fieldGeometry, fieldLineMaterial)
 scene.add(FIELD)
 
 
+// -------------------------------------------------------------------------------------------------------------------------------------------
+// ------------------------------------ APP MODE ----------------------------------------
+
+import {App} from './app_control';
+
+const APP = new App(socket);
+
+
 
 // ------------------------------------ GAMESTATE ---------------------------------------
 
@@ -157,11 +168,6 @@ window.addEventListener('resize', () =>
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 })
 
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-
-
-
 const clock = new THREE.Clock()
 let prev = 0
 
@@ -170,6 +176,11 @@ for(let i=0;i<60;i++) fps.push(1/60);
 let fpssum = 1;
 let counter = 0;
 
+
+let ass = document.getElementById('ass-value');
+
+
+var inGame = false;
 const tick = () =>
 {
 
@@ -181,21 +192,58 @@ const tick = () =>
     fps[counter] = delta;
     counter = (counter+1) % 60;
 
-
-    GAME.update(delta);
-
-    document.getElementById('users-value').innerHTML = GAME.lobby.size;
     document.getElementById('fps-value').innerHTML = Math.round(60 / fpssum);
 
-    renderer.render(GAME.scene, GAME.cams[GAME.camera_type].camera)
-    
+    if(APP.menu){
 
+        cam_rot_ang += Math.PI/1000;
+        let dist = 150;
+        camera.position.set(dist*Math.sin(cam_rot_ang), 100, dist*Math.cos(cam_rot_ang));
+        camera.lookAt(0,0,0);
+
+        renderer.render(scene, camera);
+
+        if(!APP.inGame && GAME.ready == true){
+            console.log('stopping game');
+            GAME.reset();
+        }
+
+
+    }
+
+    else{
+        GAME.update(delta);
+
+        document.getElementById('users-value').innerHTML = Object.keys(GAME.players).length;
+
+        renderer.render(GAME.scene, GAME.cams[GAME.camera_type].camera)
+    }
+
+
+
+    ass.innerHTML = ''
+    for(let asset in downloads){
+        ass.innerHTML += '<br>' + asset + ': ' + Math.round(100 * downloads[asset][0] / downloads[asset][1]) + '%'
+    }
 
     // Call tick again on the next frame
     window.requestAnimationFrame(tick)
 }
 
 tick()
+
+document.addEventListener('keydown', e => {
+    if(e.code == 'Escape'){
+        if(APP.menu == false){
+            APP.gameMenu();
+        }
+        else{
+            if(APP.inGame){
+                APP.enterGame();
+            }
+        }
+    }
+})
 
 
 
@@ -208,7 +256,11 @@ tick()
 socket.on('init', data => {
     // data: {myId, players, disc}
 
-    // log('init',data.id)
+    log('init',data.id)
+    console.log('readying game')
+    GAME.reset()
+    GAME.ready = true;
+    APP.enterGame();
 
     log('adding own player:',data.id)
     GAME.addPlayer(data.id, true);
@@ -216,7 +268,7 @@ socket.on('init', data => {
     socket.emit('newPlayer',{id:data.id})
 
     for(let pid in data.players){
-        log('adding new player:',pid)
+        log('init new player:',pid)
         GAME.addPlayer(pid);
     }
 
@@ -267,3 +319,31 @@ socket.on('ping', data => {
 setInterval(()=>{
     socket.emit('ping',{time: new Date().getTime()})
 },3000)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+socket.on('getRooms', data => {
+    APP.updateRooms(data);
+})
+
+socket.on('enterRoom', data => {
+    APP.enterRoom(data.roomID);
+})

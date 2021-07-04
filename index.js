@@ -45,10 +45,15 @@ var gamestate = {
             z: 0
         }
     },
-    throw_data: {}
+    throw_data: {},
 }
 
+
+var rooms = {};
+var roomID = '0';
+
 var ids = {};
+var room_map = {};
 
 var userID = 0;
 
@@ -59,10 +64,63 @@ io.on('connection', (client) => {
     ids[client.id] = userID;
 
     console.log(userID,'has connected!')
-    client.emit('init',{players: gamestate.players, disc: gamestate.disc, id: ids[client.id]})
+
+
+
+
+    client.on('createRoom', data => {
+        // data: {room_name, password}
+        roomID = String(parseInt(roomID) + 1);
+        rooms[roomID] = {
+            id: roomID,
+            room_name: data.room_name,
+            password: data.password,
+            gamestate: {
+                players: {},
+                disc: {
+                    state: {
+                        location: 'ground',
+                        playerID: null
+                    },
+                    position: {
+                        x: 0,
+                        y: 0,
+                        z: 0
+                    }
+                },
+                throw_data: {},
+            },
+
+            host: ids[client.id]
+        }
+
+        console.log('Created room:',rooms[roomID]);
+        console.log(ids[client.id],'has joined room (host):',roomID);
+        client.join(roomID);
+        room_map[client.id] = roomID;
+        client.emit('enterRoom', {roomID: roomID});
+        client.emit('init',{players: rooms[roomID].gamestate.players, disc: rooms[roomID].gamestate.disc, id: ids[client.id]})
+    })
+
+
+    client.on('enterRoom', data => {
+        // data: {roomID}
+        if(!(data.roomID in rooms)) return;
+
+        room_map[client.id] = data.roomID;
+        console.log(ids[client.id],'has joined room:',data.roomID);
+        client.join(String(data.roomID))
+        // console.log('client\'s rooms:',client.rooms)
+        client.emit('init',{players: rooms[data.roomID].gamestate.players, disc: rooms[data.roomID].gamestate.disc, id: ids[client.id]})    
+        
+
+    })
 
     client.on('newPlayer',function(data){
-        gamestate.players[data.id] = {
+        let rid = room_map[client.id];
+        // console.log('new player in room:',rid,'(All rooms):',rooms)
+        if(!(rid in rooms)) return;
+        rooms[rid].gamestate.players[data.id] = {
             id: data.id,
             position: {x:0,y:0,z:0},
             rotation: 0,
@@ -71,43 +129,55 @@ io.on('connection', (client) => {
             current_anim: 'idle_offence'
         };
 
-        client.broadcast.emit('newPlayer',{id:data.id});
+        console.log('[Room #'+String(rid)+']:','new player:',data.id)
+
+        client.to(rid).emit('newPlayer',{id:data.id});
     })
 
     client.on('playerState', function(data){
         // data: {id, state}
-        if(!(data.id in gamestate.players)) return;
-        gamestate.players[data.id].rotation = data.state.rotation;
-        gamestate.players[data.id].velocity = data.state.velocity;
-        gamestate.players[data.id].state = data.state.state;
-        gamestate.players[data.id].current_anim = data.state.current_anim;
+        let rid = room_map[client.id];
+        if(!(rid in rooms)) return;
+        if(!(data.id in rooms[rid].gamestate.players)) return;
+        rooms[rid].gamestate.players[data.id].rotation = data.state.rotation;
+        rooms[rid].gamestate.players[data.id].velocity = data.state.velocity;
+        rooms[rid].gamestate.players[data.id].state = data.state.state;
+        rooms[rid].gamestate.players[data.id].current_anim = data.state.current_anim;
 
-        client.broadcast.emit('playerState', data);
+        client.to(String(rid)).emit('playerState', data);
     })
 
     client.on('playerPosition', function(data){
         // data: {id, position}
-        if(!(data.id in gamestate.players)) return;
-        gamestate.players[data.id].position = data.position;
+        let rid = room_map[client.id];
+        if(!(rid in rooms)) return;
+        if(!(data.id in rooms[rid].gamestate.players)) return;
+        rooms[rid].gamestate.players[data.id].position = data.position;
 
-        client.broadcast.emit('playerPosition',data);
+        client.to(String(rid)).emit('playerPosition',data);
     })
 
     client.on('turnNeck', function(data){
-        client.broadcast.emit('turnNeck', data)
+        let rid = room_map[client.id];
+        if(!(rid in rooms)) return;
+        client.to(String(rid)).emit('turnNeck', data)
     })
 
 
     
 
     client.on('discThrow',function(data){
-        console.log('disc has been thrown!',data)
-        client.broadcast.emit('discThrow',{...data});
+        let rid = room_map[client.id];
+        if(!(rid in rooms)) return;
+        // console.log('disc has been thrown!',data)
+        client.to(String(rid)).emit('discThrow',{...data});
     })
 
     client.on('discState',function(data){
         // console.log('disc has been thrown!')
-        client.broadcast.emit('discState',data);
+        let rid = room_map[client.id];
+        if(!(rid in rooms)) return;
+        client.to(String(rid)).emit('discState',data);
     })
 
     client.on('log',function(data){
@@ -115,20 +185,47 @@ io.on('connection', (client) => {
     })
 
 
-    client.on('disconnect',function(data){
-        console.log(ids[client.id],'has disconnected!')
-        if(gamestate.disc.state.playerID == ids[client.id]){
-            gamestate.disc.state.location = 'air'
-            gamestate.disc.state.playerID = null
+    for(let event of ['disconnect','leaveRoom'])
+        client.on(event,function(data){
+            let rid = room_map[client.id];
+            console.log(ids[client.id],'has left the room!')
+            if(rid in rooms)
+                if(rooms[rid].gamestate.disc.state.playerID == ids[client.id]){
+                    rooms[rid].gamestate.disc.state.location = 'air'
+                    rooms[rid].gamestate.disc.state.playerID = null
+                }
+            // console.log(players)
+            io.to(String(rid)).emit('removePlayer',{id:ids[client.id]})
+
+            if(rid in rooms) {
+                client.leave(rid)
+                delete rooms[rid].gamestate.players[ids[client.id]];
+            }
+            if(event == 'disconnect') delete ids[client.id];
+            delete room_map[client.id];
+
+            
+            if(rid in rooms) {
+                let num_left = Object.keys(rooms[rid].gamestate.players).length
+                if(num_left == 0){
+                    console.log('Deleting room #'+rid)
+                    delete rooms[rid];
+                }
+                console.log('Players remaining (room #'+String(rid)+'):',);
+            }
+            // console.log(players)
+        })
+
+
+    client.on('getRooms',function(data){
+        let r = {}
+        for(let rid in rooms){
+            r[rid] = {
+                room_name: rooms[rid].room_name,
+                host: rooms[rid].host
+            }
         }
-        // console.log(players)
-        io.emit('removePlayer',{id:ids[client.id]})
-
-        delete gamestate.players[ids[client.id]];
-        delete ids[client.id];
-
-        console.log('Players remaining:',Object.keys(gamestate.players).length);
-        // console.log(players)
+        client.emit('getRooms',r)
     })
 
 
