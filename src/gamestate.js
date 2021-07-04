@@ -325,6 +325,7 @@ class GameState {
             else{
                 this.throw_data.spin = 1;
             }
+            
             this.socket.emit('discThrow',{...this.throw_data});
             this.throwDisc();
 
