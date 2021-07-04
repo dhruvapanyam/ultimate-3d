@@ -287,9 +287,9 @@ class GameState {
         if(!(id in this.players)) return;
         if(this.disc.state.playerID == id) this.groundDisc();
 
-        this.lobby.remove(id);
-        this.scene.remove(players[id])
-        delete players[id];
+        this.lobby.delete(id);
+        this.scene.remove(this.players[id].entity)
+        delete this.players[id];
     }
 
     movePlayer(id,pos){

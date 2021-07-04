@@ -1,5 +1,7 @@
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 const fbxLoader = new FBXLoader()
+const gltfLoader = new GLTFLoader()
 
 import {player_animations} from './state_manager'
 
@@ -21,16 +23,31 @@ loadAnimation(player_animations, anims=>{for(let a in anims) ANIMATIONS[a] = ani
 
 
 function loadModel(model_path, callback){
-    fbxLoader.load(
-        './models/'+model_path+'.fbx',
-        function(obj){
-            // console.log(model_path,obj)
-            console.log('loadModel')
-            obj.scale.set(0.05,0.05,0.05)
-            obj.traverse(node=>{if(node.isMesh){node.castShadow=true;node.receiveShadow=true;}})
-            callback(obj)
-        }
-    )
+    if(0 && model_path == 'shannon'){
+        gltfLoader.load(
+            './models/'+model_path+'.gltf',
+            function(obj){
+                console.log(model_path,obj)
+                console.log('loadModel')
+                obj.scale.set(0.05,0.05,0.05)
+                obj.traverse(node=>{if(node.isMesh){node.castShadow=true;node.receiveShadow=true;}})
+                callback(obj)
+            }
+        )
+    }
+    else{
+        console.log('loading fbx:',model_path)
+        fbxLoader.load(
+            './models/'+model_path+'.fbx',
+            function(obj){
+                // console.log(model_path,obj)
+                console.log('loadModel')
+                obj.scale.set(0.05,0.05,0.05)
+                obj.traverse(node=>{if(node.isMesh){node.castShadow=true;node.receiveShadow=true;}})
+                callback(obj)
+            }
+        )
+    }
 }
 
 function loadAnimation(anim_set, callback){
