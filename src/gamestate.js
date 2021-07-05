@@ -6,6 +6,8 @@ import {BroadcastCamera, ThirdPersonCamera} from './camera';
 
 import {MiniMap, DiscThrowArc, ThrowData} from './HUD';
 
+import {initializeLoaders} from './loaders';
+
 import * as THREE from 'three'
 
 
@@ -33,6 +35,15 @@ class GameState {
         this.field_dimensions = field_dimensions
         this.map = new MiniMap(minimap_canvas, 0.2, this.field_dimensions[0]);
 
+        this.initializedLoaders = false;
+
+    }
+
+    initializeLoaders(){
+        if(!this.initializedLoaders){
+            this.initializedLoaders = true;
+            initializeLoaders();
+        }
     }
 
     reset(){
@@ -157,7 +168,7 @@ class GameState {
         }
 
 
-        if(this.playerReady()) document.getElementById('rot-value').innerHTML = this.players[this.player_id].entity.rotation.y
+        // if(this.playerReady()) document.getElementById('rot-value').innerHTML = this.players[this.player_id].entity.rotation.y
 
     }
 
@@ -187,8 +198,14 @@ class GameState {
             let temp;
             if(this.holdingDisc())
                 temp = this.cams[this.camera_type].update(this.player_state.rotation, this.getThrowAxisPoint(), true);
-            else
-                temp = this.cams[this.camera_type].update(this.player_state.rotation, this.players[this.player_id].getPosition());
+            else{
+                let pos = this.players[this.player_id].getPosition()
+                let rot = this.player_state.rotation
+                if(this.players[this.player_id].state == 'turning_back'){
+                    rot -= this.players[this.player_id].animations['turn_back'].time/0.6 * Math.PI
+                }
+                temp = this.cams[this.camera_type].update(rot, pos);
+            }
 
             if(this.playerReady() && !this.holdingDisc() && change){
                 // console.log('neck change 2',change)

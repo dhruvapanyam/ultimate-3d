@@ -46,8 +46,8 @@ class App {
     hideCanvases(){
         document.getElementById('minimap-canvas').style.display = 'none'
         document.getElementById('speed-canvas').style.display = 'none'
-        this.canvas.style.webkitFilter = "blur(3px)"
-        this.canvas.style.opacity = 0.5
+        // this.canvas.style.webkitFilter = "blur(3px)"
+        // this.canvas.style.opacity = 0.5
         // this.canvas.style.cursor = 'pointer'
 
     }
@@ -92,6 +92,8 @@ class App {
         // this.inGame = false;
         this.hideCanvases()
         this.main_menu_DOM.style.display = 'block';
+        
+        
         this._createMainMenu();
     }
 
@@ -131,14 +133,18 @@ class App {
         this.socket.emit('enterRoom',{roomID:rid});
     }
 
-    enterRoom(rid){
+    enterRoom(rid, name){
         console.log('Entering room:',rid)
+        document.getElementById('room-value').innerHTML = name
         this.enterGame();
     }
 
     leaveRoom(){
         this.socket.emit('leaveRoom',{});
         this.inGame = false;
+        document.getElementById('room-value').innerHTML = ''
+        document.getElementById('current-room').style.display = 'none'
+        document.getElementById('players-online').style.display = 'none'
         this.mainMenu();
     }
 
@@ -220,6 +226,8 @@ class App {
         this.menu = false;
         this.inGame = true;
         this.main_menu_DOM.style.display = 'none';
+        document.getElementById('current-room').style.display = 'block'
+        document.getElementById('players-online').style.display = 'block'
         this.showCanvases();
     }
 

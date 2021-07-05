@@ -120,15 +120,19 @@ function loadAnimation(anim_set, callback){
 }
 
 
-loadModel('shannon', model => {
-    MODELS['shannon'] = model;
-})
 
-loadAnimation(player_animations, anims => {
-    for(let cname in anims){
-        ANIMATIONS[cname] = anims[cname];
-    }
-})
+function initializeLoaders(){
+    console.log('Loading models!')
+    loadModel('shannon', model => {
+        MODELS['shannon'] = model;
+    })
+
+    loadAnimation(player_animations, anims => {
+        for(let cname in anims){
+            ANIMATIONS[cname] = anims[cname];
+        }
+    })
+}
 
 
 const cloneFbx = (fbx) => {
@@ -181,4 +185,4 @@ const cloneFbx = (fbx) => {
     return clone
 }
 
-export {loadModel, MODELS, ANIMATIONS, loadAnimation, downloads, cloneFbx}
+export {loadModel, MODELS, ANIMATIONS, loadAnimation, downloads, cloneFbx, initializeLoaders}

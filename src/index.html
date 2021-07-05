@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ThreeJS Starter</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@300&display=swap" rel="stylesheet">
     <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.dev.js"></script> -->
     <!-- <link rel="shortcut icon" href="favicon.ico"> -->
     <script>
@@ -15,21 +18,24 @@
     <canvas class="webgl"></canvas>
     <div style="position: absolute; margin-top: 10px">PING: <span id="ping-value">100</span> ms</div>
     <div style="position: absolute; margin-top: 30px">FR: <span id="fps-value">30</span> fps</div>
-    <div style="position: absolute; margin-top: 50px">Players Online: <span id="users-value">0</span></div>
-    <div style="position: absolute; margin-top: 70px">Y-rot: <span id="rot-value">0</span> rad</div>
-    <div style="position: absolute; margin-top: 100px">Downloading Assets: <span id="ass-value"></span></div>
+    <div style="position: absolute; margin-top: 50px; display: none" id="current-room">Current Room: <span id="room-value"></span></div>
+    <div style="position: absolute; margin-top: 70px; display: none" id="players-online">Players Online: <span id="users-value">0</span></div>
+    <div style="position: absolute; margin-top: 100px" id="download-assets">Downloading Assets: <span id="ass-value"></span></div>
 
     <canvas style="position: absolute;;" id="minimap-canvas"></canvas>
     <canvas style="position: absolute;;" id="speed-canvas"></canvas>
 
 
     <div id="main-menu" style="position: absolute;"></div>
+
+    <div id='doms'></div>
+
 </body>
 </html>
 
 <style>
     body{
-        background-color: grey;
+        background-color: black;
     }
     * {
         /* cursor: none; */

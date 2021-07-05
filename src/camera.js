@@ -109,7 +109,7 @@ class ThirdPersonCamera {
         temp.y = y_pos
 
         if(thrower) this.camera.position.lerp(temp,0.1)
-        else this.camera.position.lerp(temp,0.08)
+        else this.camera.position.lerp(temp,0.05)
 
 
         let ltemp = pos.clone()

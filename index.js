@@ -99,7 +99,7 @@ io.on('connection', (client) => {
         client.join(roomID);
         room_map[client.id] = roomID;
         client.emit('enterRoom', {roomID: roomID});
-        client.emit('init',{players: rooms[roomID].gamestate.players, disc: rooms[roomID].gamestate.disc, id: ids[client.id]})
+        client.emit('init',{roomID: roomID, room_name: rooms[roomID].room_name, players: rooms[roomID].gamestate.players, disc: rooms[roomID].gamestate.disc, id: ids[client.id]})
     })
 
 
@@ -111,7 +111,7 @@ io.on('connection', (client) => {
         console.log(ids[client.id],'has joined room:',data.roomID);
         client.join(String(data.roomID))
         // console.log('client\'s rooms:',client.rooms)
-        client.emit('init',{players: rooms[data.roomID].gamestate.players, disc: rooms[data.roomID].gamestate.disc, id: ids[client.id]})    
+        client.emit('init',{roomID: data.roomID, room_name: rooms[data.roomID].room_name, players: rooms[data.roomID].gamestate.players, disc: rooms[data.roomID].gamestate.disc, id: ids[client.id]})    
         
 
     })
