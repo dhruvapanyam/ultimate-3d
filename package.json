@@ -1,4 +1,7 @@
 {
+  "engines":{
+    "node": "18.x"
+  },
   "repository": "#",
   "license": "UNLICENSED",
   "scripts": {
