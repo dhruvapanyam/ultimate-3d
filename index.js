@@ -22,7 +22,7 @@ function setHeaders (res, path) {
     
 }
 
-if(process.env.NODE_ENV === 'production') {    
+if(process.env.NODE_ENV === 'production' || 1){    
     app.use(express.static(path.join(__dirname, 'dist'), {
         'setHeaders': setHeaders
     }));

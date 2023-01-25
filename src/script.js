@@ -30,6 +30,7 @@ const sin = Math.sin;
 const cos = Math.cos;
 const sqrt = Math.sqrt;
 
+console.log('script.js')
 // // console.log(OrbitControls)
 // Debug
 const gui = new dat.GUI()

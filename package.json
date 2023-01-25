@@ -1,7 +1,4 @@
 {
-  "engines": {
-    "node": "18.x"
-  },
   "repository": "#",
   "license": "UNLICENSED",
   "scripts": {
@@ -25,6 +22,7 @@
     "gsap": "^3.6.1",
     "html-loader": "^2.1.1",
     "html-webpack-plugin": "^5.2.0",
+    "internal-ip": "^7.0.0",
     "localforage": "^1.9.0",
     "mini-css-extract-plugin": "^1.3.9",
     "portfinder-sync": "0.0.2",
@@ -34,13 +32,13 @@
     "style-loader": "^2.0.0",
     "three": "^0.126.0",
     "webpack": "^5.24.2",
-    "webpack-cli": "^4.5.0",
     "webpack-dev-server": "^4.11.1",
     "webpack-merge": "^5.7.3"
   },
   "devDependencies": {
     "concurrently": "^6.2.0",
-    "nodemon": "^2.0.7"
+    "nodemon": "^2.0.20",
+    "webpack-cli": "^5.0.1"
   },
   "proxy": "http://localhost:8000"
 }

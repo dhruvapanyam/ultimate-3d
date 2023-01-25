@@ -16,7 +16,7 @@ const log = (...args) => {
     socket.emit('log',{data:args});
 }
 
-
+console.log('scriptcopy.js')
 // // console.log(OrbitControls)
 // Debug
 const gui = new dat.GUI()
@@ -183,7 +183,7 @@ let ass = document.getElementById('ass-value');
 var inGame = false;
 const tick = () =>
 {
-
+    // console.log('hi')
     const elapsedTime = clock.getElapsedTime()
     let delta = elapsedTime - prev
     prev = elapsedTime
